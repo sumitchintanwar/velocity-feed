@@ -21,10 +21,12 @@ type subList struct {
 }
 
 // shard protects the topics map for a disjoint subset of topics.
-// Subscriber list reads are lock-free via atomic pointer loads.
+// Uses sync.Map for lock-free reads on the publish hot path (Alt A1).
+// mu serializes writers (Subscribe/Unsubscribe) to prevent races in the
+// read-modify-write cycle of the RCU pattern.
 type shard struct {
-	mu     sync.RWMutex
-	topics map[Topic]*atomic.Pointer[subList]
+	topics sync.Map // map[Topic]*atomic.Pointer[subList]
+	mu     sync.Mutex // serializes writers (Subscribe/Unsubscribe)
 }
 
 // subscriber tracks one client's delivery queue and topic membership.
@@ -37,6 +39,13 @@ type subscriber struct {
 	handle Handle // back-pointer to the handle returned by Subscribe
 }
 
+// subShard protects a subset of subscribers for a disjoint subset of subscriber IDs.
+// This reduces contention on the global subscriber registry during market-open storms.
+type subShard struct {
+	mu   sync.Mutex
+	subs map[ID]*subscriber
+}
+
 // MemoryManager is the in-memory Manager implementation. It uses sharded
 // locks and copy-on-write subscriber lists to minimize contention on the
 // publish hot path.
@@ -44,8 +53,8 @@ type MemoryManager struct {
 	shards    []shard
 	shardMask uint64
 
-	subMu sync.RWMutex
-	subs  map[ID]*subscriber
+	subShards    []subShard
+	subShardMask uint64
 }
 
 // New creates a MemoryManager. If shards <= 0, defaultShardCount is used.
@@ -56,12 +65,13 @@ func New(shards int) *MemoryManager {
 	}
 
 	tm := &MemoryManager{
-		shards:    make([]shard, n),
-		shardMask: uint64(n - 1),
-		subs:      make(map[ID]*subscriber),
+		shards:       make([]shard, n),
+		shardMask:    uint64(n - 1),
+		subShards:    make([]subShard, n),
+		subShardMask: uint64(n - 1),
 	}
-	for i := range tm.shards {
-		tm.shards[i].topics = make(map[Topic]*atomic.Pointer[subList])
+	for i := range tm.subShards {
+		tm.subShards[i].subs = make(map[ID]*subscriber)
 	}
 	return tm
 }
@@ -81,6 +91,10 @@ func (tm *MemoryManager) hashTopic(t Topic) uint64 {
 	return fnv1a(t) & tm.shardMask
 }
 
+func (tm *MemoryManager) hashSubscriber(id ID) uint64 {
+	return fnv1a(id) & tm.subShardMask
+}
+
 // ---------- Manager interface ----------
 
 func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
@@ -88,17 +102,19 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 		return nil
 	}
 
-	tm.subMu.Lock()
-	sub, exists := tm.subs[id]
+	si := tm.hashSubscriber(id)
+	ss := &tm.subShards[si]
+	ss.mu.Lock()
+	sub, exists := ss.subs[id]
 	if !exists {
 		sub = &subscriber{
 			ch:     make(chan marketdata.MarketEvent, defaultBuffer),
 			done:   make(chan struct{}),
 			topics: make(map[Topic]struct{}, len(topics)),
 		}
-		tm.subs[id] = sub
+		ss.subs[id] = sub
 	}
-	tm.subMu.Unlock()
+	ss.mu.Unlock()
 
 	for _, t := range topics {
 		if _, ok := sub.topics[t]; ok {
@@ -107,22 +123,26 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 		si := tm.hashTopic(t)
 		s := &tm.shards[si]
 
-		// COW: load current list, create new list with sub appended, swap.
+		// Acquire shard mutex to serialize writers and prevent races.
 		s.mu.Lock()
-		ap := s.topics[t]
-		if ap == nil {
-			ap = &atomic.Pointer[subList]{}
-			s.topics[t] = ap
-		}
-		old := ap.Load()
+		// COW: load current list, create new list with sub appended, swap.
+		// sync.Map: Load is lock-free for established keys.
 		var oldSubs []*subscriber
-		if old != nil {
-			oldSubs = old.subs
+		if v, ok := s.topics.Load(t); ok {
+			ap := v.(*atomic.Pointer[subList])
+			if old := ap.Load(); old != nil {
+				oldSubs = old.subs
+			}
+			newSubs := make([]*subscriber, 0, len(oldSubs)+1)
+			newSubs = append(newSubs, oldSubs...)
+			newSubs = append(newSubs, sub)
+			ap.Store(&subList{subs: newSubs})
+		} else {
+			ap := &atomic.Pointer[subList]{}
+			newSubs := []*subscriber{sub}
+			ap.Store(&subList{subs: newSubs})
+			s.topics.Store(t, ap)
 		}
-		newSubs := make([]*subscriber, 0, len(oldSubs)+1)
-		newSubs = append(newSubs, oldSubs...)
-		newSubs = append(newSubs, sub)
-		ap.Store(&subList{subs: newSubs})
 		s.mu.Unlock()
 
 		sub.topics[t] = struct{}{}
@@ -135,38 +155,45 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 }
 
 func (tm *MemoryManager) Unsubscribe(id ID) {
-	tm.subMu.Lock()
-	sub, ok := tm.subs[id]
+	si := tm.hashSubscriber(id)
+	ss := &tm.subShards[si]
+	ss.mu.Lock()
+	sub, ok := ss.subs[id]
 	if !ok {
-		tm.subMu.Unlock()
+		ss.mu.Unlock()
 		return
 	}
-	delete(tm.subs, id)
-	tm.subMu.Unlock()
+	delete(ss.subs, id)
+	ss.mu.Unlock()
 
 	// Remove from every topic shard via COW.
 	for t := range sub.topics {
 		si := tm.hashTopic(t)
 		s := &tm.shards[si]
 
+		// Acquire shard mutex to serialize writers and prevent races.
 		s.mu.Lock()
-		if ap, ok := s.topics[t]; ok {
-			old := ap.Load()
-			var oldSubs []*subscriber
-			if old != nil {
-				oldSubs = old.subs
+		v, ok := s.topics.Load(t)
+		if !ok {
+			s.mu.Unlock()
+			continue
+		}
+		ap := v.(*atomic.Pointer[subList])
+		old := ap.Load()
+		var oldSubs []*subscriber
+		if old != nil {
+			oldSubs = old.subs
+		}
+		newSubs := make([]*subscriber, 0, len(oldSubs))
+		for _, s := range oldSubs {
+			if s != sub {
+				newSubs = append(newSubs, s)
 			}
-			newSubs := make([]*subscriber, 0, len(oldSubs))
-			for _, s := range oldSubs {
-				if s != sub {
-					newSubs = append(newSubs, s)
-				}
-			}
-			if len(newSubs) == 0 {
-				delete(s.topics, t)
-			} else {
-				ap.Store(&subList{subs: newSubs})
-			}
+		}
+		if len(newSubs) == 0 {
+			s.topics.Delete(t)
+		} else {
+			ap.Store(&subList{subs: newSubs})
 		}
 		s.mu.Unlock()
 	}
@@ -179,22 +206,18 @@ func (tm *MemoryManager) Unsubscribe(id ID) {
 }
 
 // Publish delivers an event to all subscribers of the event's topic.
-// The hot path performs: 1 atomic pointer load, 0 allocations, 0 locks.
+// Lock-free hot path: sync.Map.Load (no RWMutex) + atomic pointer load.
 func (tm *MemoryManager) Publish(_ context.Context, event marketdata.MarketEvent) {
 	topic := event.EventSymbol()
 	si := tm.hashTopic(topic)
 	s := &tm.shards[si]
 
-	// SL1/COW fix: Read the atomic pointer under read lock, then iterate
-	// the immutable list with no locks held. The list pointer and its
-	// contents are stable — writers create new lists, never mutate.
-	s.mu.RLock()
-	ap := s.topics[topic]
-	s.mu.RUnlock()
-
-	if ap == nil {
+	// sync.Map.Load is lock-free for established keys — no RWMutex needed.
+	v, ok := s.topics.Load(topic)
+	if !ok {
 		return
 	}
+	ap := v.(*atomic.Pointer[subList])
 	list := ap.Load()
 	if list == nil {
 		return
@@ -215,13 +238,11 @@ func (tm *MemoryManager) SubscriberCount(topic Topic) int {
 	si := tm.hashTopic(topic)
 	s := &tm.shards[si]
 
-	s.mu.RLock()
-	ap := s.topics[topic]
-	s.mu.RUnlock()
-
-	if ap == nil {
+	v, ok := s.topics.Load(topic)
+	if !ok {
 		return 0
 	}
+	ap := v.(*atomic.Pointer[subList])
 	if list := ap.Load(); list != nil {
 		return len(list.subs)
 	}
@@ -232,9 +253,10 @@ func (tm *MemoryManager) TopicCount() int {
 	count := 0
 	for i := range tm.shards {
 		s := &tm.shards[i]
-		s.mu.RLock()
-		count += len(s.topics)
-		s.mu.RUnlock()
+		s.topics.Range(func(_, _ any) bool {
+			count++
+			return true
+		})
 	}
 	return count
 }
@@ -243,11 +265,10 @@ func (tm *MemoryManager) Topics() []Topic {
 	var result []Topic
 	for i := range tm.shards {
 		s := &tm.shards[i]
-		s.mu.RLock()
-		for t := range s.topics {
-			result = append(result, t)
-		}
-		s.mu.RUnlock()
+		s.topics.Range(func(key, _ any) bool {
+			result = append(result, key.(Topic))
+			return true
+		})
 	}
 	return result
 }

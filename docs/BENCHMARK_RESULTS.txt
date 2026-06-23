@@ -1,0 +1,143 @@
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/pubsub
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkPublish_1Sub-8                	 6967802	       229.5 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_10Subs-8              	 3695630	       353.8 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_100Subs-8             	 1000000	      1376 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_1000Subs-8            	   95528	     12069 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_100Subs-8     	 1000000	      1128 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_1000Subs-8    	  163178	      7223 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_10000Subs-8   	   19664	     60260 ns/op	     112 B/op	       1 allocs/op
+BenchmarkSubscribe_1Symbol-8           	  423878	      2997 ns/op	    5114 B/op	       7 allocs/op
+BenchmarkSubscribe_10Symbols-8         	  286126	      4740 ns/op	    5186 B/op	      16 allocs/op
+BenchmarkSubscribe_100Symbols-8        	   64594	     16016 ns/op	    5908 B/op	     106 allocs/op
+BenchmarkUnsubscribe_100Subs-8         	   12589	     85178 ns/op	       3 B/op	       0 allocs/op
+BenchmarkMixed_80_20-8                 	  548496	      2263 ns/op	    1115 B/op	       2 allocs/op
+BenchmarkSnapshotDelivery-8            	  501621	      2847 ns/op	    5130 B/op	       8 allocs/op
+BenchmarkMemoryPerSubscriber-8         	  464542	      2722 ns/op	    5130 B/op	       8 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/pubsub	29.250s
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/topicmanager
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkPublish_1Subscriber-8                	11289314	       118.1 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_10Subscribers-8              	 6257107	       184.2 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_100Subscribers-8             	 1000000	      1297 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublish_1000Subscribers-8            	  106621	     11280 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_100Subscribers-8     	 2990976	       469.2 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_1000Subscribers-8    	  440676	      2987 ns/op	     112 B/op	       1 allocs/op
+BenchmarkPublishParallel_10000Subscribers-8   	   38556	     33426 ns/op	     112 B/op	       1 allocs/op
+BenchmarkSubscribe_1Topic-8                   	  341418	      3228 ns/op	    5490 B/op	      13 allocs/op
+BenchmarkSubscribe_10Topics-8                 	  161053	      7540 ns/op	    6170 B/op	      51 allocs/op
+BenchmarkSubscribe_100Topics-8                	   22915	     48221 ns/op	   13533 B/op	     411 allocs/op
+BenchmarkUnsubscribe_100Subscribers-8         	   10000	    106912 ns/op	   44921 B/op	     199 allocs/op
+BenchmarkMixed_80_20-8                        	  595929	      1996 ns/op	    1553 B/op	       3 allocs/op
+BenchmarkTopicCount-8                         	 4063066	       265.2 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSubscriberCount-8                    	23450552	        56.22 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/topicmanager	31.228s
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/feed
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkPipeline_1Symbol-8             	 3142564	       521.1 ns/op	   1918609 events/sec	     112 B/op	       1 allocs/op
+BenchmarkPipeline_5Symbols-8            	 2503930	       520.7 ns/op	   1920240 events/sec	     112 B/op	       1 allocs/op
+BenchmarkPipeline_100Symbols-8          	 2323495	       502.9 ns/op	   1988418 events/sec	     112 B/op	       1 allocs/op
+BenchmarkPipeline_MemoryBus_1Sub-8      	    2048	    559771 ns/op	      1785 events/sec	   57345 B/op	     512 allocs/op
+BenchmarkPipeline_MemoryBus_10Subs-8    	    2040	    576911 ns/op	      1732 events/sec	   19210 B/op	     171 allocs/op
+BenchmarkPipeline_MemoryBus_100Subs-8   	    1964	    676764 ns/op	      1477 events/sec	    4147 B/op	      37 allocs/op
+BenchmarkPipeline_Scaling/subs_1-8      	    2026	    575731 ns/op	   51577 B/op	     460 allocs/op
+BenchmarkPipeline_Scaling/subs_10-8     	    1983	    586056 ns/op	   20233 B/op	     180 allocs/op
+BenchmarkPipeline_Scaling/subs_100-8    	    2050	    609084 ns/op	    2416 B/op	      21 allocs/op
+BenchmarkPipeline_Scaling/subs_1000-8   	    1838	    615942 ns/op	     253 B/op	       2 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/feed	15.455s
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/marketdata/simulator
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkSimulator_Generate_1Symbol-8       	    1957	    632405 ns/op	      1581 quotes/sec	      16 B/op	       1 allocs/op
+BenchmarkSimulator_Generate_5Symbols-8      	    9308	    123841 ns/op	      8075 quotes/sec	      16 B/op	       0 allocs/op
+BenchmarkSimulator_Generate_100Symbols-8    	  150193	      7568 ns/op	    132139 quotes/sec	      19 B/op	       0 allocs/op
+BenchmarkSimulator_Subscribe_1Symbol-8      	 6070102	       199.0 ns/op	       0 B/op	       0 allocs/op
+BenchmarkSimulator_Subscribe_10Symbols-8    	  685450	      1940 ns/op	     456 B/op	       3 allocs/op
+BenchmarkSimulator_Subscribe_100Symbols-8   	   83166	     13138 ns/op	    3496 B/op	       3 allocs/op
+BenchmarkSimulator_NextPrice-8              	26366498	        84.10 ns/op	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/marketdata/simulator	11.708s
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/transport
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkHealthEndpoint-8         	  770203	      2180 ns/op	    1140 B/op	      15 allocs/op
+BenchmarkReadyEndpoint-8          	  607455	      2015 ns/op	    1159 B/op	      15 allocs/op
+BenchmarkHealthDetailEndpoint-8   	  234216	      5725 ns/op	    2288 B/op	      27 allocs/op
+BenchmarkMetricsEndpoint-8        	   17871	     72643 ns/op	   48887 B/op	     182 allocs/op
+BenchmarkRootEndpoint-8           	  303669	      4279 ns/op	    6408 B/op	      15 allocs/op
+BenchmarkMiddlewareStack-8        	  475567	      2933 ns/op	    1131 B/op	      15 allocs/op
+BenchmarkConcurrentRequests-8     	 1000000	      1259 ns/op	    1129 B/op	      15 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/transport	11.344s
+goos: windows
+goarch: amd64
+pkg: github.com/sumit/rtmds/internal/bench
+cpu: 11th Gen Intel(R) Core(TM) i5-1135G7 @ 2.40GHz
+BenchmarkBackpressure_SlowConsumer-8        	 3856615	       411.5 ns/op	   2429949 fast_events_sec	       791.4 slow_events_sec	      12 B/op	       0 allocs/op
+BenchmarkBackpressure_SlowRatio-8           	    1952	    626224 ns/op	   2456093 fast_events_sec	        97.35 slow_events_sec	   19963 B/op	     178 allocs/op
+BenchmarkBackpressure_BurstLoad-8           	      28	  38715143 ns/op	     25826 events_sec	  224586 B/op	    2005 allocs/op
+BenchmarkBackpressure_Gateway-8             	    2064	    580518 ns/op	   84423 B/op	     753 allocs/op
+BenchmarkBackpressure_SubscriptionChurn-8   	  390206	      3628 ns/op	    5378 B/op	      11 allocs/op
+BenchmarkEndToEndLatency_1Sub-8             	 1000000	      1137 ns/op	    879708 events/sec	      1090 p50_us	      2005 p95_us	      2691 p99_us	     130 B/op	       1 allocs/op
+--- BENCH: BenchmarkEndToEndLatency_1Sub-8
+    e2e_bench_test.go:238: Latency: P50=1.0008ms P95=2.0044ms P99=2.0044ms P99.9=2.0044ms (n=5447)
+    e2e_bench_test.go:238: Latency: P50=1.0104ms P95=1.5202ms P99=1.5202ms P99.9=1.5202ms (n=5114)
+    e2e_bench_test.go:238: Latency: P50=1.0937ms P95=1.5229ms P99=2.3834ms P99.9=2.3834ms (n=13312)
+    e2e_bench_test.go:238: Latency: P50=1.0847ms P95=2.0433ms P99=2.8688ms P99.9=4.4038ms (n=1734335)
+BenchmarkEndToEndLatency_10Subs-8           	 3293732	       373.9 ns/op	   2674761 events/sec	      3587 p50_us	      5349 p95_us	      6124 p99_us	      13 B/op	       0 allocs/op
+--- BENCH: BenchmarkEndToEndLatency_10Subs-8
+    e2e_bench_test.go:238: Latency: P50=2.0021ms P95=3.9985ms P99=4.5022ms P99.9=4.5022ms (n=15293)
+    e2e_bench_test.go:238: Latency: P50=2.034ms P95=3.6421ms P99=4.022ms P99.9=6.1502ms (n=26634)
+    e2e_bench_test.go:238: Latency: P50=3.3225ms P95=4.0868ms P99=5.0992ms P99.9=6.5547ms (n=33476)
+    e2e_bench_test.go:238: Latency: P50=3.914ms P95=6.2066ms P99=8.1629ms P99.9=27.227ms (n=3064527)
+    e2e_bench_test.go:238: Latency: P50=3.8731ms P95=5.3995ms P99=6.1408ms P99.9=37.7202ms (n=11641710)
+BenchmarkEndToEndLatency_100Subs-8          	 3769152	       319.8 ns/op	   3127165 events/sec	     32566 p50_us	     37267 p95_us	     38934 p99_us	       1 B/op	       0 allocs/op
+--- BENCH: BenchmarkEndToEndLatency_100Subs-8
+    e2e_bench_test.go:238: Latency: P50=3.999ms P95=6.8656ms P99=7.874ms P99.9=10.1326ms (n=23574)
+    e2e_bench_test.go:238: Latency: P50=3.0052ms P95=5.9986ms P99=8.0151ms P99.9=10.009ms (n=23861)
+    e2e_bench_test.go:238: Latency: P50=3.2513ms P95=6.0649ms P99=6.0649ms P99.9=7.0766ms (n=16358)
+    e2e_bench_test.go:238: Latency: P50=34.2018ms P95=39.3941ms P99=42.8783ms P99.9=121.91ms (n=2406312)
+    e2e_bench_test.go:238: Latency: P50=34.0504ms P95=38.9527ms P99=41.5091ms P99.9=248.013ms (n=11830030)
+BenchmarkEndToEndLatency_1000Subs-8         	 4077733	       301.6 ns/op	   3315902 events/sec	    307584 p50_us	    324014 p95_us	    338240 p99_us	       0 B/op	       0 allocs/op
+--- BENCH: BenchmarkEndToEndLatency_1000Subs-8
+    e2e_bench_test.go:238: Latency: P50=2.5246ms P95=6.2825ms P99=6.2825ms P99.9=7.0011ms (n=12288)
+    e2e_bench_test.go:238: Latency: P50=3.0368ms P95=6.1686ms P99=6.1686ms P99.9=6.1686ms (n=11387)
+    e2e_bench_test.go:238: Latency: P50=2.8886ms P95=6.94ms P99=8.0028ms P99.9=8.0028ms (n=15008)
+    e2e_bench_test.go:238: Latency: P50=180.6254ms P95=312.3205ms P99=331.0217ms P99.9=331.6194ms (n=1308433)
+    e2e_bench_test.go:238: Latency: P50=307.1795ms P95=390.0176ms P99=480.0457ms P99.9=490.8934ms (n=13081044)
+BenchmarkEndToEndThroughput-8               	 3421869	       332.2 ns/op	   3011075 events_sec	     30111 per_subscriber_sec	       1 B/op	       0 allocs/op
+BenchmarkEndToEndWithTopicManager-8         	 4061947	       319.6 ns/op	   3129088 events/sec	       1 B/op	       0 allocs/op
+BenchmarkMemoryPerEvent-8                   	 3303496	       374.3 ns/op	      11 B/op	       0 allocs/op
+BenchmarkGoroutineLeakDetection-8           	     222	   5415765 ns/op	    5375 B/op	      10 allocs/op
+BenchmarkLatencyHistogram_100Subs-8         	 4267191	       307.3 ns/op	   3254340 events/sec	     31881 p50_us	     35862 p95_us	     37624 p99_us	       1 B/op	       0 allocs/op
+--- BENCH: BenchmarkLatencyHistogram_100Subs-8
+    e2e_bench_test.go:479: Latency: P50=3.3369ms P95=9.1294ms P99=9.6331ms P99.9=19.7752ms (n=33465)
+    e2e_bench_test.go:480: Histogram:
+          0-100us          1282 (  3.2%) ####
+          100us-500us         0 (  0.0%) 
+          500us-1ms        1274 (  3.2%) ####
+          1-2ms            3049 (  7.6%) ##########
+          2-5ms           11469 ( 28.5%) ########################################
+          5-10ms          10575 ( 26.3%) ####################################
+          10-50ms          7167 ( 17.8%) ########################
+          50ms+               0 (  0.0%) 
+	... [output truncated]
+BenchmarkTopicExplosion_1000Topics-8        	 5103867	       217.4 ns/op	      1000 topics	     112 B/op	       1 allocs/op
+BenchmarkTopicExplosion_10000Topics-8       	 6133576	       189.2 ns/op	     10000 topics	     112 B/op	       1 allocs/op
+BenchmarkMemoryScaling/subs_10-8            	 3712108	       344.6 ns/op	      1117 gc_cycles	39389047032 sys_bytes	      11 B/op	       0 allocs/op
+BenchmarkMemoryScaling/subs_100-8           	 4109848	       338.7 ns/op	      1123 gc_cycles	39389047032 sys_bytes	       1 B/op	       0 allocs/op
+BenchmarkMemoryScaling/subs_1000-8          	 4267897	       276.5 ns/op	      1133 gc_cycles	39389047032 sys_bytes	       0 B/op	       0 allocs/op
+BenchmarkMemoryScaling/subs_5000-8          	 4551732	       276.9 ns/op	      1148 gc_cycles	39389047032 sys_bytes	       0 B/op	       0 allocs/op
+PASS
+ok  	github.com/sumit/rtmds/internal/bench	74.954s

@@ -1,0 +1,147 @@
+openapi: "3.1.0"
+info:
+  title: Real-Time Market Data System API
+  version: "1.0.0"
+  description: |
+    HTTP and WebSocket API for the Real-Time Market Data System (RTMDS).
+    Subscribe to live market quotes via the `/ws` WebSocket endpoint.
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+paths:
+  /health:
+    get:
+      summary: Liveness probe
+      operationId: getHealth
+      responses:
+        "200":
+          description: Server is alive
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+
+  /ready:
+    get:
+      summary: Readiness probe
+      operationId: getReady
+      responses:
+        "200":
+          description: Server is ready to serve traffic
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+        "503":
+          description: Server is not ready (dependencies unavailable)
+
+  /ws:
+    get:
+      summary: WebSocket endpoint for real-time market data
+      operationId: connectWebSocket
+      description: |
+        Upgrade to WebSocket. After connection send a **subscribe** message to
+        start receiving quotes, and an **unsubscribe** message to stop.
+
+        **Client → Server (subscribe)**
+        ```json
+        { "action": "subscribe", "symbols": ["AAPL", "TSLA"] }
+        ```
+
+        **Client → Server (unsubscribe)**
+        ```json
+        { "action": "unsubscribe", "symbols": ["AAPL"] }
+        ```
+
+        **Server → Client (quote event)**
+        ```json
+        {
+          "type": "quote",
+          "payload": {
+            "symbol": "AAPL",
+            "type": "trade",
+            "price": 182.34,
+            "bid": 182.33,
+            "ask": 182.35,
+            "volume": 4500,
+            "timestamp": "2024-11-01T14:30:00.123Z",
+            "provider": "simulator"
+          }
+        }
+        ```
+      responses:
+        "101":
+          description: Switching Protocols — WebSocket handshake successful
+
+  /metrics:
+    get:
+      summary: Prometheus metrics scrape endpoint
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Prometheus text exposition format
+          content:
+            text/plain:
+              schema:
+                type: string
+
+components:
+  schemas:
+    StatusResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: ok
+
+    SubscribeRequest:
+      type: object
+      required: [action, symbols]
+      properties:
+        action:
+          type: string
+          enum: [subscribe, unsubscribe]
+        symbols:
+          type: array
+          items:
+            type: string
+          example: ["AAPL", "TSLA"]
+
+    Quote:
+      type: object
+      properties:
+        symbol:
+          type: string
+        type:
+          type: string
+          enum: [trade, quote, bar]
+        price:
+          type: number
+          format: double
+        bid:
+          type: number
+          format: double
+        ask:
+          type: number
+          format: double
+        volume:
+          type: integer
+          format: int64
+        timestamp:
+          type: string
+          format: date-time
+        provider:
+          type: string
+
+    ServerMessage:
+      type: object
+      properties:
+        type:
+          type: string
+          enum: [quote, bar, error, subscribed]
+        payload:
+          oneOf:
+            - $ref: "#/components/schemas/Quote"
+            - type: string

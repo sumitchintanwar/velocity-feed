@@ -41,7 +41,7 @@ func BenchmarkBackpressure_SlowConsumer(b *testing.B) {
 		}
 	}()
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -103,7 +103,7 @@ func BenchmarkBackpressure_SlowRatio(b *testing.B) {
 		}
 	}()
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -152,7 +152,7 @@ func BenchmarkBackpressure_BurstLoad(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -199,11 +199,11 @@ func BenchmarkBackpressure_Gateway(b *testing.B) {
 	m, log := newBenchMetrics("bench_bp_gw")
 	bus := pubsub.NewMemoryBus(log, m)
 	tm := topicmanager.New(0)
-	gw := websocket.NewGateway(tm, log, m)
+	gw := websocket.NewGateway(tm, log, m, 500, "test-gw")
 
 	_ = gw
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})

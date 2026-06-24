@@ -1,0 +1,21 @@
+╔═══════════════════════════════════════════════════════════╗
+║         RTMDS Distributed Benchmark Client              ║
+╚═══════════════════════════════════════════════════════════╝
+
+Config: 50 clients, 5 symbols, 30s duration
+Target: ws://localhost:8080/ws
+
+Waiting for system to be ready... Ready!
+Ramping up 50 clients...
+  [Metrics] messages=0 connected=0
+  [Metrics] messages=38767 connected=1
+  [Metrics] messages=92243 connected=14
+  [Metrics] messages=138854 connected=14
+  [Metrics] messages=189576 connected=15
+  [Metrics] messages=234698 connected=20
+  [Metrics] messages=285746 connected=30
+  [Metrics] messages=334617 connected=31
+
+Connected: 30, Failed: 0
+
+Benchmark complete.

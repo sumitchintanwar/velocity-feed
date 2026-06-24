@@ -1,0 +1,124 @@
+# Stateless Gateway Architecture with Service Discovery
+#
+# Architecture:
+#   Client → Nginx (least_conn) → Gateway 1/2/3 → Redis → Market Data
+#
+# - Nginx uses least_conn to distribute connections by active load
+# - Clients own subscription state (fat client pattern)
+# - On reconnect, client re-sends SUBSCRIBE to any available gateway
+# - Gateways register in Redis for service discovery (TTL heartbeat)
+# - /gateways endpoint lists all active gateway instances
+#
+# Quick start:
+#   docker compose -f docker-compose.sticky.yml up --build
+#
+# Verify routing:
+#   curl -s -D - -o /dev/null http://localhost:8080/health
+#   # Check rtmds-gateway-id header — different gateways possible
+#
+# Check service discovery:
+#   curl -s http://localhost:8080/gateways | jq .
+#
+# Test WebSocket:
+#   wscat -c ws://localhost:8080/ws
+#   # Reconnect multiple times — may land on different gateways (by design)
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: rtmds-redis-sticky
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway1-sticky
+    environment:
+      RTMDS_SERVER_PORT: "9091"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9091"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "true"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    # No port mapping - nginx handles external traffic
+    expose:
+      - "9091"
+
+  gateway2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway2-sticky
+    environment:
+      RTMDS_SERVER_PORT: "9092"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9092"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9092"
+
+  gateway3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway3-sticky
+    environment:
+      RTMDS_SERVER_PORT: "9093"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9093"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9093"
+
+  nginx:
+    image: nginx:alpine
+    container_name: rtmds-nginx-sticky
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway1
+      - gateway2
+      - gateway3
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/nginx-health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

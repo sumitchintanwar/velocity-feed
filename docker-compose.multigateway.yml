@@ -1,0 +1,89 @@
+# Multi-Gateway Architecture
+#
+# 1 Redis instance + 3 independent gateway instances:
+#   - gateway1 (port 9091): Primary — feed generator + Redis publisher + subscriber
+#   - gateway2 (port 9092): Subscriber-only — receives from Redis, serves clients
+#   - gateway3 (port 9093): Subscriber-only — receives from Redis, serves clients
+#
+# Quick start:
+#   docker compose -f docker-compose.multigateway.yml up --build
+#
+# Verify:
+#   curl http://localhost:9091/health
+#   curl http://localhost:9092/health
+#   curl http://localhost:9093/health
+#
+# WebSocket clients:
+#   wscat -c ws://localhost:9091/ws
+#   wscat -c ws://localhost:9092/ws
+#   wscat -c ws://localhost:9093/ws
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: rtmds-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway1
+    ports:
+      - "9091:9091"
+    environment:
+      RTMDS_SERVER_PORT: "9091"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "true"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  gateway2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway2
+    ports:
+      - "9092:9092"
+    environment:
+      RTMDS_SERVER_PORT: "9092"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+  gateway3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gateway3
+    ports:
+      - "9093:9093"
+    environment:
+      RTMDS_SERVER_PORT: "9093"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy

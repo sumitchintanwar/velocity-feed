@@ -1,0 +1,23 @@
+# Development image with Go + Redis for building, testing, and running RTMDS.
+# Usage:
+#   docker compose -f docker-compose.dev.yml up -d redis   # start Redis
+#   docker compose -f docker-compose.dev.yml run --rm dev   # enter dev shell
+#   docker compose -f docker-compose.dev.yml run --rm dev go test ./...
+
+FROM golang:1.23-alpine
+
+RUN apk add --no-cache gcc musl-dev redis
+
+ENV GOTOOLCHAIN=auto
+
+WORKDIR /app
+
+# Cache dependencies first.
+COPY go.mod go.sum ./
+RUN go mod download
+
+# Copy source.
+COPY . .
+
+# Default: start an interactive shell.
+CMD ["sh"]

@@ -38,7 +38,7 @@ func BenchmarkPool_Throughput_16Workers(b *testing.B) {
 func benchPoolThroughput(b *testing.B, workers, queueCap int) {
 	pub := &benchPublisher{}
 	cfg := Config{Workers: workers, QueueCapacity: queueCap, ShutdownTimeout: 10 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -73,7 +73,7 @@ func BenchmarkPool_Queue_16384(b *testing.B) {
 func benchPoolQueue(b *testing.B, queueCap int) {
 	pub := &benchPublisher{}
 	cfg := Config{Workers: 8, QueueCapacity: queueCap, ShutdownTimeout: 10 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -93,7 +93,7 @@ func BenchmarkPool_DropRate(b *testing.B) {
 	// 1 worker, tiny queue — forces drops.
 	pub := &benchPublisher{}
 	cfg := Config{Workers: 1, QueueCapacity: 16, ShutdownTimeout: 10 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -120,7 +120,7 @@ func BenchmarkPool_Scaling(b *testing.B) {
 		b.Run(fmt.Sprintf("workers_%d", workers), func(b *testing.B) {
 			pub := &benchPublisher{}
 			cfg := Config{Workers: workers, QueueCapacity: 4096, ShutdownTimeout: 10 * time.Second}
-			p := New(cfg, pub, nopLogger())
+			p := New(cfg, pub, nopLogger(), nil)
 
 			ctx := context.Background()
 			p.Start(ctx)

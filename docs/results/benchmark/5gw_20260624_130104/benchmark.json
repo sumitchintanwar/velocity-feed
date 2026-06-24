@@ -1,0 +1,158 @@
+╔═══════════════════════════════════════════════════════════╗
+║         RTMDS Distributed Benchmark Client              ║
+╚═══════════════════════════════════════════════════════════╝
+
+Config: 50 clients, 5 symbols, 30s duration
+Target: ws://localhost:8080/ws
+
+Waiting for system to be ready... Ready!
+Ramping up 50 clients...
+  [Metrics] messages=148 connected=10
+  [Metrics] messages=298 connected=23
+
+All clients connected. Running benchmark for 30s...
+
+  [Metrics] messages=448 connected=23
+  [Metrics] messages=598 connected=23
+  [Metrics] messages=748 connected=23
+  [Metrics] messages=898 connected=23
+  [Metrics] messages=1048 connected=23
+  [Metrics] messages=1198 connected=23
+
+Benchmark duration elapsed
+
+╔═══════════════════════════════════════════════════════════╗
+║                    BENCHMARK RESULTS                    ║
+╚═══════════════════════════════════════════════════════════╝
+
+Duration:        30.000356549s
+Connected:       23 clients
+Failed:          0 clients
+Total Messages:  1198
+Total Bytes:     257419
+
+Throughput:      40 msg/sec
+Bandwidth:       0.01 MB/sec
+
+Latency:
+  Mean:          1.01 ms
+  Min:           0.60 ms
+  Max:           4.24 ms
+  P50:           1.00 ms
+  P95:           2.50 ms
+  P99:           5.00 ms
+  P99.9:         5.00 ms
+
+Histogram:
+  Latency Distribution:
+         0.1ms       0 (  0.0%) 
+         0.2ms       0 (  0.0%) 
+         0.5ms       0 (  0.0%) 
+         1.0ms     860 ( 72.0%) ###################################
+         2.5ms     321 ( 26.9%) #############
+         5.0ms      14 (  1.2%) 
+        10.0ms       0 (  0.0%) 
+        25.0ms       0 (  0.0%) 
+        50.0ms       0 (  0.0%) 
+       100.0ms       0 (  0.0%) 
+       250.0ms       0 (  0.0%) 
+       500.0ms       0 (  0.0%) 
+      >500.0ms       0 (  0.0%) 
+{
+  "timestamp": "2026-06-24T13:01:34Z",
+  "config": {
+    "WebSocketURL": "ws://localhost:8080/ws",
+    "NumClients": 50,
+    "NumSymbols": 5,
+    "Duration": 30000000000,
+    "RampUp": 10000000000,
+    "ReportInterval": 5000000000,
+    "OutputFile": "/dev/stdout"
+  },
+  "total_messages": 1198,
+  "total_bytes": 257419,
+  "duration": "30.000356549s",
+  "messages_per_sec": 39.932858732638394,
+  "bytes_per_sec": 8580.53135400421,
+  "connected_clients": 23,
+  "failed_clients": 0,
+  "latency": {
+    "mean_ms": 1.007989958158996,
+    "min_ms": 0.605,
+    "max_ms": 4.24,
+    "p50_ms": 1,
+    "p95_ms": 2.5,
+    "p99_ms": 5,
+    "p999_ms": 5
+  },
+  "histogram": [
+    {
+      "upper_bound": "0.1ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "0.2ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "0.5ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "1.0ms",
+      "count": 860,
+      "percent": 71.96652719665272
+    },
+    {
+      "upper_bound": "2.5ms",
+      "count": 321,
+      "percent": 26.861924686192467
+    },
+    {
+      "upper_bound": "5.0ms",
+      "count": 14,
+      "percent": 1.1715481171548117
+    },
+    {
+      "upper_bound": "10.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "25.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "50.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "100.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "250.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "500.0ms",
+      "count": 0,
+      "percent": 0
+    },
+    {
+      "upper_bound": "\u003e500.0ms",
+      "count": 0,
+      "percent": 0
+    }
+  ]
+}
+Results saved to: /dev/stdout
+
+Benchmark complete.

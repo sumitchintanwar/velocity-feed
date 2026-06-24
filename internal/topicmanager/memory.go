@@ -4,13 +4,19 @@ import (
 	"context"
 	"sync"
 	"sync/atomic"
+	"time"
 
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
+	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/internal/platform"
 )
 
 const (
 	defaultShardCount = 16
-	defaultBuffer     = 256
+	defaultBuffer     = 64 // reduced from 256 to enforce tighter backpressure
 )
 
 // subList is an immutable snapshot of subscribers for a topic.
@@ -30,13 +36,24 @@ type shard struct {
 }
 
 // subscriber tracks one client's delivery queue and topic membership.
-// The event channel is NEVER closed — cancellation is signaled via done.
+// When using clientqueue integration, the queue field is non-nil and
+// ch/done are derived from it. When using legacy mode (New without queue),
+// ch/done are used directly.
 type subscriber struct {
-	ch     chan marketdata.MarketEvent
+	ch     chan *marketdata.CachedEvent
 	done   chan struct{} // closed on unsubscribe
 	topics map[Topic]struct{}
 	closed atomic.Bool
 	handle Handle // back-pointer to the handle returned by Subscribe
+
+	// queue is the per-client backpressure queue. When non-nil, it
+	// replaces ch/done for event delivery. Set via NewWithQueue.
+	queue *clientqueue.CachedQueue
+
+	// legacyDropped counts events silently dropped on the legacy
+	// raw-channel path (when queue is nil). Provides observability
+	// for the non-clientqueue code path.
+	legacyDropped atomic.Uint64
 }
 
 // subShard protects a subset of subscribers for a disjoint subset of subscriber IDs.
@@ -55,9 +72,25 @@ type MemoryManager struct {
 
 	subShards    []subShard
 	subShardMask uint64
+
+	// queueCfg enables per-subscriber clientqueue integration.
+	// When nil, legacy raw-channel mode is used.
+	queueCfg *clientqueue.Config
+	log      zerolog.Logger
+	reg      prometheus.Registerer
+
+	// appMetrics is optional application-level metrics. When non-nil,
+	// Subscribe / Unsubscribe / Publish keep the platform.Metrics counters
+	// and gauges accurate (broadcasts, drops, subscribers, subscriptions).
+	appMetrics *platform.Metrics
+
+	// Prometheus instruments for topic-level observability.
+	publishLatency    prometheus.Histogram
+	publishOperations prometheus.Counter
 }
 
-// New creates a MemoryManager. If shards <= 0, defaultShardCount is used.
+// New creates a MemoryManager with legacy raw-channel mode.
+// If shards <= 0, defaultShardCount is used.
 func New(shards int) *MemoryManager {
 	n := nextPowerOf2(shards)
 	if n <= 0 {
@@ -73,6 +106,44 @@ func New(shards int) *MemoryManager {
 	for i := range tm.subShards {
 		tm.subShards[i].subs = make(map[ID]*subscriber)
 	}
+	return tm
+}
+
+// NewWithQueue creates a MemoryManager with per-subscriber clientqueue
+// integration. Each subscriber gets an independent bounded queue with
+// the specified backpressure policy. If queueCfg is nil, defaults are used.
+// The appMetrics parameter is optional: when non-nil, the manager increments
+// the application-level Prometheus instruments (broadcasts, drops, subscribers,
+// subscription events).
+func NewWithQueue(shards int, queueCfg *clientqueue.Config, log zerolog.Logger, reg prometheus.Registerer, appMetrics *platform.Metrics) *MemoryManager {
+	tm := New(shards)
+	if queueCfg == nil {
+		defaults := clientqueue.DefaultConfig()
+		queueCfg = &defaults
+	}
+	tm.queueCfg = queueCfg
+	tm.log = log
+	tm.reg = reg
+	tm.appMetrics = appMetrics
+
+	// Register topic-level Prometheus instruments.
+	if reg != nil {
+		f := promauto.With(reg)
+		tm.publishLatency = f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: "rtmds",
+			Subsystem: "topic",
+			Name:      "publish_latency_seconds",
+			Help:      "Time in seconds to publish an event to all subscribers.",
+			Buckets:   []float64{0.00001, 0.00005, 0.0001, 0.0005, 0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0},
+		})
+		tm.publishOperations = f.NewCounter(prometheus.CounterOpts{
+			Namespace: "rtmds",
+			Subsystem: "topic",
+			Name:      "publish_operations_total",
+			Help:      "Total number of publish operations performed.",
+		})
+	}
+
 	return tm
 }
 
@@ -108,9 +179,21 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 	sub, exists := ss.subs[id]
 	if !exists {
 		sub = &subscriber{
-			ch:     make(chan marketdata.MarketEvent, defaultBuffer),
 			done:   make(chan struct{}),
 			topics: make(map[Topic]struct{}, len(topics)),
+		}
+		// Per-subscriber backpressure queue (CachedEvent mode).
+		if tm.queueCfg != nil {
+			cfg := *tm.queueCfg
+			log := tm.log
+			if log.GetLevel() == zerolog.Disabled {
+				log = zerolog.Nop()
+			}
+			sub.queue = clientqueue.NewCachedQueue(id, cfg, log, tm.reg, func(reason string) {
+				tm.Unsubscribe(id)
+			})
+		} else {
+			sub.ch = make(chan *marketdata.CachedEvent, defaultBuffer)
 		}
 		ss.subs[id] = sub
 	}
@@ -151,6 +234,16 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 	if sub.handle == nil {
 		sub.handle = &handle{sub: sub, id: id, mgr: tm}
 	}
+
+	// First-time subscriptions bump the active subscribers gauge and the
+	// subscribe counter; re-subscribes only count as events.
+	if tm.appMetrics != nil {
+		if !exists {
+			tm.appMetrics.SubscribersActive.Inc()
+		}
+		tm.appMetrics.SubscriptionEvents.WithLabelValues("subscribe").Inc()
+	}
+
 	return sub.handle
 }
 
@@ -203,16 +296,28 @@ func (tm *MemoryManager) Unsubscribe(id ID) {
 	if sub.closed.CompareAndSwap(false, true) {
 		close(sub.done)
 	}
+	// Close the per-client queue if using clientqueue integration.
+	if sub.queue != nil {
+		sub.queue.Close()
+	}
+
+	// Subscription counter and active-subscribers gauge.
+	if tm.appMetrics != nil {
+		tm.appMetrics.SubscribersActive.Dec()
+		tm.appMetrics.SubscriptionEvents.WithLabelValues("unsubscribe").Inc()
+	}
 }
 
 // Publish delivers an event to all subscribers of the event's topic.
-// Lock-free hot path: sync.Map.Load (no RWMutex) + atomic pointer load.
+// Encodes JSON ONCE, then fans out the pre-encoded bytes to all subscribers.
+// This eliminates O(N) JSON serialization in the Gateway writePump path.
 func (tm *MemoryManager) Publish(_ context.Context, event marketdata.MarketEvent) {
+	start := time.Now()
+
 	topic := event.EventSymbol()
 	si := tm.hashTopic(topic)
 	s := &tm.shards[si]
 
-	// sync.Map.Load is lock-free for established keys — no RWMutex needed.
 	v, ok := s.topics.Load(topic)
 	if !ok {
 		return
@@ -223,13 +328,48 @@ func (tm *MemoryManager) Publish(_ context.Context, event marketdata.MarketEvent
 		return
 	}
 
+	// Encode JSON ONCE for all subscribers.
+	cached := marketdata.NewCachedEvent(event)
+
+	var sent, dropped int
 	for _, sub := range list.subs {
 		if sub.closed.Load() {
 			continue
 		}
-		select {
-		case sub.ch <- event:
-		default:
+		if sub.queue != nil {
+			if sub.queue.Send(cached) {
+				sent++
+			} else {
+				dropped++
+			}
+		} else {
+			select {
+			case sub.ch <- cached:
+				sent++
+			default:
+				sub.legacyDropped.Add(1)
+				dropped++
+			}
+		}
+	}
+
+	// Record publish latency and operation count.
+	if tm.publishLatency != nil {
+		tm.publishLatency.Observe(time.Since(start).Seconds())
+	}
+	if tm.publishOperations != nil {
+		tm.publishOperations.Inc()
+	}
+
+	// Application-level instruments — aggregate broadcast counter and
+	// dropped-event counter. Cardinality stays bounded (no per-symbol or
+	// per-subscriber labels).
+	if tm.appMetrics != nil {
+		if sent > 0 {
+			tm.appMetrics.BroadcastsTotal.Add(float64(sent))
+		}
+		if dropped > 0 {
+			tm.appMetrics.EventsDroppedTotal.Add(float64(dropped))
 		}
 	}
 }
@@ -283,11 +423,21 @@ type handle struct {
 
 // C returns the event channel. It is NEVER closed. Use Done() to detect
 // cancellation instead of relying on channel close.
-func (h *handle) C() <-chan marketdata.MarketEvent { return h.sub.ch }
+func (h *handle) C() <-chan *marketdata.CachedEvent {
+	if h.sub.queue != nil {
+		return h.sub.queue.C()
+	}
+	return h.sub.ch
+}
 
 // Done returns a channel that is closed when the subscription is cancelled.
 // Select on this alongside C() to detect termination.
-func (h *handle) Done() <-chan struct{} { return h.sub.done }
+func (h *handle) Done() <-chan struct{} {
+	if h.sub.queue != nil {
+		return h.sub.queue.Done()
+	}
+	return h.sub.done
+}
 
 func (h *handle) Cancel() { h.mgr.Unsubscribe(h.id) }
 func (h *handle) ID() ID  { return h.id }

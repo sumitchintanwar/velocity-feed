@@ -22,7 +22,7 @@ func setupTestGateway(t *testing.T) (*Gateway, topicmanager.Manager) {
 	t.Helper()
 	metrics, _ := platform.NewMetrics("test_ws")
 	tm := topicmanager.New(0)
-	gw := NewGateway(tm, zerolog.Nop(), metrics)
+	gw := NewGateway(tm, zerolog.Nop(), metrics, 0, "test-gw") // 0 = no rate limit for tests
 	return gw, tm
 }
 

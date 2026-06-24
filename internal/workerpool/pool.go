@@ -61,21 +61,23 @@ type PoolStats struct {
 // Pool is a bounded-concurrency worker pool. It manages N worker
 // goroutines that drain a shared bounded queue and call Publisher.Publish.
 type Pool struct {
-	cfg      Config
+	cfg       Config
 	publisher Publisher
-	log      zerolog.Logger
-	stats    PoolStats
+	log       zerolog.Logger
+	stats     PoolStats
+	metrics   *Metrics
 
-	queue      chan any
-	wg         sync.WaitGroup
-	cancel     context.CancelFunc // cancels worker context on shutdown
-	stopped    atomic.Bool        // SS1: prevents Enqueue after Shutdown
-	closeOnce  sync.Once          // SS2: only close queue once
-	shutdownOnce sync.Once        // SS2: only run Shutdown logic once
+	queue       chan any
+	wg          sync.WaitGroup
+	cancel      context.CancelFunc // cancels worker context on shutdown
+	stopped     atomic.Bool        // SS1: prevents Enqueue after Shutdown
+	closeOnce   sync.Once          // SS2: only close queue once
+	shutdownOnce sync.Once         // SS2: only run Shutdown logic once
 }
 
 // New creates a Pool with the given config. Call Start to begin processing.
-func New(cfg Config, publisher Publisher, log zerolog.Logger) *Pool {
+// metrics can be nil — in that case, only atomic PoolStats are updated.
+func New(cfg Config, publisher Publisher, log zerolog.Logger, metrics *Metrics) *Pool {
 	if cfg.Workers <= 0 {
 		cfg.Workers = 8
 	}
@@ -90,6 +92,7 @@ func New(cfg Config, publisher Publisher, log zerolog.Logger) *Pool {
 		cfg:       cfg,
 		publisher: publisher,
 		log:       log,
+		metrics:   metrics,
 		queue:     make(chan any, cfg.QueueCapacity),
 	}
 }
@@ -110,6 +113,9 @@ func (p *Pool) Enqueue(event any) bool {
 	// SS1: reject if shutdown has started.
 	if p.stopped.Load() {
 		p.stats.Dropped.Add(1)
+		if p.metrics != nil {
+			p.metrics.TasksDropped.Inc()
+		}
 		return false
 	}
 
@@ -117,18 +123,31 @@ func (p *Pool) Enqueue(event any) bool {
 	defer func() {
 		if r := recover(); r != nil {
 			p.stats.Dropped.Add(1)
+			if p.metrics != nil {
+				p.metrics.TasksDropped.Inc()
+			}
 		}
 	}()
 
 	p.stats.QueueDepth.Add(1)
+	if p.metrics != nil {
+		p.metrics.QueueDepth.Inc()
+	}
 	select {
 	case p.queue <- event:
 		// QS2: track total enqueued attempts.
 		p.stats.Enqueued.Add(1)
+		if p.metrics != nil {
+			p.metrics.TasksReceived.Inc()
+		}
 		return true
 	default:
 		p.stats.Dropped.Add(1)
 		p.stats.QueueDepth.Add(-1)
+		if p.metrics != nil {
+			p.metrics.TasksDropped.Inc()
+			p.metrics.QueueDepth.Dec()
+		}
 		return false
 	}
 }
@@ -180,10 +199,18 @@ func (p *Pool) worker(ctx context.Context, id int) {
 // when Publish panics, preventing QueueDepth counter drift.
 func (p *Pool) processEvent(ctx context.Context, id int, event any) {
 	p.stats.QueueDepth.Add(-1)
+	if p.metrics != nil {
+		p.metrics.QueueDepth.Dec()
+		p.metrics.ActiveWorkers.Inc()
+	}
+	start := time.Now()
 	func() {
 		defer func() {
 			if r := recover(); r != nil {
 				p.stats.Panics.Add(1)
+				if p.metrics != nil {
+					p.metrics.TasksFailed.Inc()
+				}
 				p.log.Error().
 					Int("worker", id).
 					Interface("panic", r).
@@ -191,6 +218,11 @@ func (p *Pool) processEvent(ctx context.Context, id int, event any) {
 			}
 			// QS1: always count as processed (recovered or not).
 			p.stats.Processed.Add(1)
+			if p.metrics != nil {
+				p.metrics.TasksCompleted.Inc()
+				p.metrics.TaskDurationSeconds.Observe(time.Since(start).Seconds())
+				p.metrics.ActiveWorkers.Dec()
+			}
 		}()
 
 		p.publisher.Publish(ctx, event)

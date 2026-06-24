@@ -1,0 +1,195 @@
+# Benchmark Docker Compose — 3 Gateways (default)
+#
+# Usage:
+#   docker compose -f docker-compose.benchmark.yml up --build -d
+#   docker compose -f docker-compose.benchmark.yml down -v
+#
+# For 1 gateway:
+#   docker compose -f docker-compose.benchmark.yml up --build -d gateway1 nginx redis
+#
+# For 5 gateways (default):
+#   docker compose -f docker-compose.benchmark.yml up --build -d
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: rtmds-bench-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 512mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - bench-net
+
+  gateway1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-bench-gw1
+    environment:
+      RTMDS_SERVER_PORT: "9091"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9091"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "true"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA,META,NVDA,JPM,V,JNJ"
+      RTMDS_FEED_BENCHMARK_MODE: "true"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "warn"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9091"
+    networks:
+      - bench-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+
+  gateway2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-bench-gw2
+    environment:
+      RTMDS_SERVER_PORT: "9092"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9092"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA,META,NVDA,JPM,V,JNJ"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "warn"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9092"
+    networks:
+      - bench-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+
+  gateway3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-bench-gw3
+    environment:
+      RTMDS_SERVER_PORT: "9093"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9093"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA,META,NVDA,JPM,V,JNJ"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "warn"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9093"
+    networks:
+      - bench-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+
+  gateway4:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-bench-gw4
+    environment:
+      RTMDS_SERVER_PORT: "9094"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9094"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA,META,NVDA,JPM,V,JNJ"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "warn"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9094"
+    networks:
+      - bench-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+
+  gateway5:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-bench-gw5
+    environment:
+      RTMDS_SERVER_PORT: "9095"
+      RTMDS_SERVER_GATEWAY_ID: "gateway-9095"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA,META,NVDA,JPM,V,JNJ"
+      RTMDS_DISCOVERY_ENABLED: "true"
+      RTMDS_DISCOVERY_TTL: "30s"
+      RTMDS_DISCOVERY_HEARTBEAT_INTERVAL: "10s"
+      RTMDS_LOG_LEVEL: "warn"
+      RTMDS_LOG_FORMAT: "json"
+    depends_on:
+      redis:
+        condition: service_healthy
+    expose:
+      - "9095"
+    networks:
+      - bench-net
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 512M
+
+  nginx:
+    image: nginx:alpine
+    container_name: rtmds-bench-nginx
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./nginx/nginx-benchmark.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - gateway1
+      - gateway2
+      - gateway3
+    networks:
+      - bench-net
+
+networks:
+  bench-net:
+    driver: bridge

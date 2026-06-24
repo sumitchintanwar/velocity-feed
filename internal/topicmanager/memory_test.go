@@ -26,8 +26,8 @@ func testQuote(symbol string, price float64) marketdata.Quote {
 }
 
 // recvEvent attempts to receive one event from a handle within timeout.
-// Returns the event and true if received, nil and false on timeout.
-func recvEvent(h Handle, timeout time.Duration) (marketdata.MarketEvent, bool) {
+// Returns the CachedEvent and true if received, nil and false on timeout.
+func recvEvent(h Handle, timeout time.Duration) (*marketdata.CachedEvent, bool) {
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	for {
@@ -51,16 +51,20 @@ func TestSubscribe_DeliversEvents(t *testing.T) {
 
 	m.Publish(context.Background(), testQuote("AAPL", 150.0))
 
-	ev, ok := recvEvent(h, 100*time.Millisecond)
+	cached, ok := recvEvent(h, 100*time.Millisecond)
 	if !ok {
 		t.Fatal("timed out")
 	}
-	quote, ok := ev.(marketdata.Quote)
+	quote, ok := cached.Event.(marketdata.Quote)
 	if !ok {
-		t.Fatalf("expected Quote, got %T", ev)
+		t.Fatalf("expected Quote, got %T", cached.Event)
 	}
 	if quote.Symbol != "AAPL" || quote.Price != 150.0 {
 		t.Errorf("unexpected: %+v", quote)
+	}
+	// Verify pre-encoded JSON is non-empty.
+	if len(cached.EncodedMsg) == 0 {
+		t.Error("expected non-empty pre-encoded JSON")
 	}
 }
 

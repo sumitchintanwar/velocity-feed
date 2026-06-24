@@ -1,0 +1,49 @@
+╔═══════════════════════════════════════════════════════════╗
+║         RTMDS Distributed Benchmark Client              ║
+╚═══════════════════════════════════════════════════════════╝
+
+Config: 50 clients, 5 symbols, 30s duration
+Target: ws://localhost:8080/ws
+
+Waiting for system to be ready... Ready!
+Ramping up 50 clients...
+  [Metrics] messages=0 connected=0
+  [Metrics] messages=0 connected=1
+  [Metrics] messages=0 connected=14
+  [Metrics] messages=0 connected=31
+  [Metrics] messages=0 connected=35
+
+Connected: 50, Failed: 0
+Running benchmark for 30s...
+
+  [Metrics] messages=0 connected=50
+  [Metrics] messages=0 connected=50
+  [Metrics] messages=0 connected=50
+  [Metrics] messages=0 connected=50
+
+Benchmark duration elapsed
+
+╔═══════════════════════════════════════════════════════════╗
+║                    BENCHMARK RESULTS                    ║
+╚═══════════════════════════════════════════════════════════╝
+
+Duration:        30.008013036s
+Connected:       50 clients
+Failed:          0 clients
+Total Messages:  0
+Total Bytes:     0
+
+Throughput:      0 msg/sec
+Bandwidth:       0.00 MB/sec
+
+Latency:
+  Mean:          0.00 ms
+  Min:           179769313486231570814527423731704356798070567525844996598917476803157260780028538760589558632766878171540458953514382464234321326889464182768467546703537516986049910576551282076245490090389328944075868508455133942304583236903222948165808559332123348274797826204144723168738177180919299881250404026184124858368.00 ms
+  Max:           0.00 ms
+  P50:           0.00 ms
+  P95:           0.00 ms
+  P99:           0.00 ms
+  P99.9:         0.00 ms
+2026/06/24 13:28:23 Failed to marshal results: json: unsupported value: NaN
+
+Benchmark complete.

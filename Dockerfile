@@ -1,6 +1,8 @@
 # ─── Stage 1: build ────────────────────────────────────────────────────────────
 FROM golang:1.23-alpine AS builder
 
+ENV GOTOOLCHAIN=auto
+
 # Install git for go mod download and ca-certificates for TLS.
 RUN apk add --no-cache git ca-certificates tzdata
 

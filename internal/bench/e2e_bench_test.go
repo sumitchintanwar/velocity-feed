@@ -209,7 +209,7 @@ func benchE2ELatency(b *testing.B, numSubs int) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -262,7 +262,7 @@ func BenchmarkEndToEndThroughput(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -314,7 +314,7 @@ func BenchmarkEndToEndWithTopicManager(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, &pub, log)
+	p := feed.NewPipeline(f, &pub, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -371,7 +371,7 @@ func BenchmarkMemoryPerEvent(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -450,7 +450,7 @@ func BenchmarkLatencyHistogram_100Subs(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log)
+	p := feed.NewPipeline(f, bus, log, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -548,7 +548,7 @@ func BenchmarkMemoryScaling(b *testing.B) {
 				}()
 			}
 
-			p := feed.NewPipeline(f, bus, log)
+			p := feed.NewPipeline(f, bus, log, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
 			done := make(chan struct{})

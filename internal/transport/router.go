@@ -13,6 +13,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/config"
+	"github.com/sumit/rtmds/internal/discovery"
 	"github.com/sumit/rtmds/internal/platform"
 	ws "github.com/sumit/rtmds/internal/websocket"
 )
@@ -31,6 +32,7 @@ type HealthReporter interface {
 //	GET  /ready           readiness probe
 //	GET  /ws              WebSocket upgrade endpoint
 //	GET  /metrics         Prometheus scrape endpoint (if enabled)
+//	GET  /gateways        list active gateways (if discovery enabled)
 func NewRouter(
 	cfg *config.Config,
 	gw *ws.Gateway,
@@ -38,6 +40,7 @@ func NewRouter(
 	metrics *platform.Metrics,
 	gatherer prometheus.Gatherer,
 	healthReporter HealthReporter,
+	registry *discovery.Registry,
 ) http.Handler {
 	r := chi.NewRouter()
 
@@ -48,12 +51,19 @@ func NewRouter(
 	r.Use(prometheusMiddleware(metrics))
 	r.Use(middleware.Recoverer)
 
+	// Gateway ID for sticky session verification
+	gatewayID := gw.ID()
+
 	// --- Routes ---
 	r.Get("/", handleRoot())
-	r.Get("/health", handleHealth())
-	r.Get("/health/detail", handleHealthDetail(healthReporter))
-	r.Get("/ready", handleReady())
+	r.Get("/health", handleHealth(healthReporter, gatewayID))
+	r.Get("/health/detail", handleHealthDetail(healthReporter, gatewayID))
+	r.Get("/ready", handleReady(healthReporter, gatewayID))
 	r.Get("/ws", gw.Handler())
+
+	if registry != nil {
+		r.Get("/gateways", handleGateways(registry))
+	}
 
 	if cfg.Metrics.Enabled {
 		r.Handle(cfg.Metrics.Path, promhttp.HandlerFor(gatherer, promhttp.HandlerOpts{}))
@@ -90,7 +100,7 @@ func handleRoot() http.HandlerFunc {
 <tr><td><code>/health</code></td><td>GET</td><td>Liveness probe</td></tr>
 <tr><td><code>/health/detail</code></td><td>GET</td><td>Detailed component health</td></tr>
 <tr><td><code>/ready</code></td><td>GET</td><td>Readiness probe</td></tr>
-<tr><td><code>/ws</code></td><td>GET</td><td>WebSocket upgrade</td></tr>
+	<tr><td><code>/ws</code></td><td>GET</td><td>WebSocket upgrade</td></tr>
 <tr><td><code>/metrics</code></td><td>GET</td><td>Prometheus metrics</td></tr>
 </table>
 
@@ -98,24 +108,33 @@ func handleRoot() http.HandlerFunc {
 <p>Connect with a WebSocket client and send:</p>
 <pre><code>{"action":"subscribe","symbols":["AAPL","MSFT","GOOG"]}</code></pre>
 <p>Example with <a href="https://github.com/vi/websocat">websocat</a>:</p>
-<pre><code>websocat ws://localhost:8080/ws
+<pre><code>websocat ws://localhost:9090/ws
 # then paste: {"action":"subscribe","symbols":["AAPL"]}</code></pre>
 </body></html>`))
 	}
 }
 
-// handleHealth returns a 200 OK liveness probe.
-func handleHealth() http.HandlerFunc {
+// handleHealth returns a 200 OK liveness probe. This endpoint NEVER checks
+// dependencies (Redis, etc.) — it only proves the process is alive.
+// Kubernetes liveness probe: if this returns non-200, the pod is restarted.
+// Dependencies are checked by /ready (readiness probe).
+// Sets rtmds-gateway-id header for sticky session verification.
+func handleHealth(_ HealthReporter, gatewayID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("rtmds-gateway-id", gatewayID)
 		_, _ = w.Write([]byte(`{"status":"ok"}`))
 	}
 }
 
 // handleHealthDetail returns detailed health status of all components.
-func handleHealthDetail(reporter HealthReporter) http.HandlerFunc {
+// Sets rtmds-gateway-id header for sticky session verification.
+func handleHealthDetail(reporter HealthReporter, gatewayID string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		report := reporter.HealthReport(r.Context())
+
+		// Set gateway ID header for sticky session verification
+		w.Header().Set("rtmds-gateway-id", gatewayID)
 
 		// Determine overall status
 		allOK := true
@@ -142,11 +161,53 @@ func handleHealthDetail(reporter HealthReporter) http.HandlerFunc {
 	}
 }
 
-// handleReady returns a 200 OK readiness probe. Extend this to check
-// downstream dependencies (Redis, feed connectivity) before returning 200.
-func handleReady() http.HandlerFunc {
-	return func(w http.ResponseWriter, _ *http.Request) {
+// handleReady returns a 200 OK readiness probe if all critical dependencies
+// (Redis, etc.) are healthy. Returns 503 if any dependency is down —
+// Nginx will stop routing traffic to this gateway but won't kill the pod.
+// Sets rtmds-gateway-id header for sticky session verification.
+func handleReady(reporter HealthReporter, gatewayID string) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
+		w.Header().Set("rtmds-gateway-id", gatewayID)
+
+		// Check if any critical component is unhealthy
+		if reporter != nil {
+			report := reporter.HealthReport(r.Context())
+			for _, status := range report {
+				if !status.OK {
+					w.WriteHeader(http.StatusServiceUnavailable)
+					_ = json.NewEncoder(w).Encode(map[string]string{
+						"status": "not_ready",
+						"error":  status.Detail,
+					})
+					return
+				}
+			}
+		}
+
 		_, _ = w.Write([]byte(`{"status":"ready"}`))
+	}
+}
+
+// handleGateways returns a JSON list of all active gateways from the
+// service discovery registry. Only available when discovery is enabled.
+func handleGateways(registry *discovery.Registry) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		gateways, err := registry.List(r.Context())
+		if err != nil {
+			w.Header().Set("Content-Type", "application/json")
+			w.WriteHeader(http.StatusInternalServerError)
+			_ = json.NewEncoder(w).Encode(map[string]string{
+				"status": "error",
+				"error":  err.Error(),
+			})
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{
+			"gateways": gateways,
+			"count":    len(gateways),
+		})
 	}
 }

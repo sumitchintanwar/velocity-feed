@@ -34,6 +34,16 @@ func DefaultConfig() Config {
 	}
 }
 
+// BenchmarkConfig returns a high-throughput config for stress testing.
+// Produces ~50,000 msg/sec with 5 symbols (100μs tick interval).
+func BenchmarkConfig() Config {
+	return Config{
+		TickInterval: 100 * time.Microsecond,
+		BasePrice:    100.0,
+		Volatility:   0.02,
+	}
+}
+
 // Validate checks that the config values are within acceptable ranges.
 func (c Config) Validate() error {
 	if c.TickInterval <= 0 {
@@ -129,7 +139,7 @@ func (s *Simulator) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 		return nil, fmt.Errorf("simulator: Run already started")
 	}
 
-	out := make(chan marketdata.Quote, 64)
+	out := make(chan marketdata.Quote, 4096)
 
 	go func() {
 		defer close(out)

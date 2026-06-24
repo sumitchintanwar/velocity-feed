@@ -28,7 +28,7 @@ func nopLogger() zerolog.Logger {
 func TestPool_ProcessesAllEvents(t *testing.T) {
 	pub := &testPublisher{}
 	cfg := Config{Workers: 4, QueueCapacity: 256, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -50,7 +50,7 @@ func TestPool_ProcessesAllEvents(t *testing.T) {
 
 func TestPool_ZeroEvents(t *testing.T) {
 	pub := &testPublisher{}
-	p := New(DefaultConfig(), pub, nopLogger())
+	p := New(DefaultConfig(), pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -70,7 +70,7 @@ func TestPool_DropsWhenQueueFull(t *testing.T) {
 	// 1 worker, queue of 2. Enqueue 4 events without starting workers.
 	pub := &testPublisher{}
 	cfg := Config{Workers: 1, QueueCapacity: 2, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	accepted := 0
 	dropped := 0
@@ -98,7 +98,7 @@ func TestPool_DropsWhenQueueFull(t *testing.T) {
 func TestPool_ConcurrentEnqueue(t *testing.T) {
 	pub := &testPublisher{}
 	cfg := Config{Workers: 4, QueueCapacity: 1024, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -127,7 +127,7 @@ func TestPool_ConcurrentEnqueue(t *testing.T) {
 func TestPool_ShutdownDrainsQueue(t *testing.T) {
 	pub := &testPublisher{}
 	cfg := Config{Workers: 2, QueueCapacity: 64, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -150,7 +150,7 @@ func TestPool_ShutdownTimeout(t *testing.T) {
 	// a real-world publisher stuck on I/O or a lock.
 	slowPub := &sleepPublisher{duration: 10 * time.Second}
 	cfg := Config{Workers: 1, QueueCapacity: 1, ShutdownTimeout: 100 * time.Millisecond}
-	p := New(cfg, slowPub, nopLogger())
+	p := New(cfg, slowPub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -176,7 +176,7 @@ func (p *sleepPublisher) Publish(_ context.Context, _ any) {
 
 func TestPool_EnqueueAfterShutdown(t *testing.T) {
 	pub := &testPublisher{}
-	p := New(DefaultConfig(), pub, nopLogger())
+	p := New(DefaultConfig(), pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -208,7 +208,7 @@ func TestPool_EnqueueAfterShutdown(t *testing.T) {
 func TestPool_WorkerRecoversFromPanic(t *testing.T) {
 	pub := &panicOncePublisher{}
 	cfg := Config{Workers: 1, QueueCapacity: 64, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -253,7 +253,7 @@ func (p *panicOncePublisher) Publish(_ context.Context, _ any) {
 func TestPool_StatsAccurate(t *testing.T) {
 	pub := &testPublisher{}
 	cfg := Config{Workers: 2, QueueCapacity: 256, ShutdownTimeout: 5 * time.Second}
-	p := New(cfg, pub, nopLogger())
+	p := New(cfg, pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)
@@ -294,7 +294,7 @@ func TestDefaultConfig(t *testing.T) {
 
 func TestPool_DoubleShutdown(t *testing.T) {
 	pub := &testPublisher{}
-	p := New(DefaultConfig(), pub, nopLogger())
+	p := New(DefaultConfig(), pub, nopLogger(), nil)
 
 	ctx := context.Background()
 	p.Start(ctx)

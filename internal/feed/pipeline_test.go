@@ -87,7 +87,7 @@ func (p *mockPublisher) published() []marketdata.Quote {
 func TestPipeline_PublishesAllQuotes(t *testing.T) {
 	feed := newMockFeed(nil)
 	pub := &mockPublisher{}
-	p := NewPipeline(feed, pub, zerolog.Nop())
+	p := NewPipeline(feed, pub, zerolog.Nop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -115,7 +115,7 @@ func TestPipeline_PublishesAllQuotes(t *testing.T) {
 func TestPipeline_StopOnContext(t *testing.T) {
 	feed := newMockFeed(nil)
 	pub := &mockPublisher{}
-	p := NewPipeline(feed, pub, zerolog.Nop())
+	p := NewPipeline(feed, pub, zerolog.Nop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -134,7 +134,7 @@ func TestPipeline_FeedErrorReturned(t *testing.T) {
 	feedErr := errors.New("feed connection lost")
 	feed := newMockFeed(feedErr)
 	pub := &mockPublisher{}
-	p := NewPipeline(feed, pub, zerolog.Nop())
+	p := NewPipeline(feed, pub, zerolog.Nop(), nil)
 
 	err := p.Run(context.Background())
 	if err == nil {
@@ -148,7 +148,7 @@ func TestPipeline_FeedErrorReturned(t *testing.T) {
 func TestPipeline_PublisherReceivesFeedOutput(t *testing.T) {
 	feed := newMockFeed(nil)
 	pub := &mockPublisher{}
-	p := NewPipeline(feed, pub, zerolog.Nop())
+	p := NewPipeline(feed, pub, zerolog.Nop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)
@@ -183,7 +183,7 @@ func TestPipeline_PublisherErrorDoesNotCrash(t *testing.T) {
 			// pipeline doesn't assume that.
 		},
 	}
-	p := NewPipeline(feed, pub, zerolog.Nop())
+	p := NewPipeline(feed, pub, zerolog.Nop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan error, 1)

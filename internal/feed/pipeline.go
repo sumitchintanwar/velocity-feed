@@ -7,9 +7,11 @@ package feed
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
 )
 
@@ -20,14 +22,17 @@ type Pipeline struct {
 	feed      marketdata.Feed
 	publisher pubsub.Publisher
 	log       zerolog.Logger
+	metrics   *platform.Metrics // optional; nil disables instrumentation
 }
 
-// NewPipeline creates a Pipeline. Both parameters are required.
-func NewPipeline(feed marketdata.Feed, publisher pubsub.Publisher, log zerolog.Logger) *Pipeline {
+// NewPipeline creates a Pipeline. The metrics parameter is optional —
+// pass nil to disable Prometheus instrumentation.
+func NewPipeline(feed marketdata.Feed, publisher pubsub.Publisher, log zerolog.Logger, metrics *platform.Metrics) *Pipeline {
 	return &Pipeline{
 		feed:      feed,
 		publisher: publisher,
 		log:       log,
+		metrics:   metrics,
 	}
 }
 
@@ -40,6 +45,9 @@ func NewPipeline(feed marketdata.Feed, publisher pubsub.Publisher, log zerolog.L
 func (p *Pipeline) Run(ctx context.Context) error {
 	quotes, err := p.feed.Run(ctx)
 	if err != nil {
+		if p.metrics != nil {
+			p.metrics.FeedErrors.WithLabelValues(p.feed.Name(), "start").Inc()
+		}
 		return fmt.Errorf("pipeline: feed start: %w", err)
 	}
 
@@ -51,6 +59,14 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			if !ok {
 				p.log.Info().Msg("pipeline: feed channel closed")
 				return nil
+			}
+			if p.metrics != nil {
+				// Cardinality fix: only label by provider, never by symbol.
+				p.metrics.FeedMessagesReceived.
+					WithLabelValues(q.Provider).
+					Inc()
+				// Track data staleness: wall clock minus exchange timestamp.
+				p.metrics.DataStaleness.Set(time.Since(q.Timestamp).Seconds())
 			}
 			p.publisher.Publish(ctx, q)
 

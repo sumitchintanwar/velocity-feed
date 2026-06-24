@@ -27,7 +27,7 @@ var (
 func TestMain(m *testing.M) {
 	metrics, _ := platform.NewMetrics("bench_ws")
 	sharedTM = topicmanager.New(0)
-	sharedGateway = NewGateway(sharedTM, zerolog.Nop(), metrics)
+	sharedGateway = NewGateway(sharedTM, zerolog.Nop(), metrics, 0, "bench-gw") // 0 = no rate limit for benchmarks
 	sharedServer = httptest.NewServer(sharedGateway.Handler())
 	sharedURL = "ws" + strings.TrimPrefix(sharedServer.URL, "http") + "/ws"
 	

@@ -163,7 +163,7 @@ func (b *MemoryBus) Publish(ctx context.Context, event marketdata.MarketEvent) {
 		b.metrics.BroadcastsTotal.Add(float64(sent))
 	}
 	if dropped > 0 {
-		b.metrics.EventsDroppedTotal.WithLabelValues(sym).Add(float64(dropped))
+		b.metrics.EventsDroppedTotal.Add(float64(dropped))
 	}
 }
 

@@ -23,11 +23,11 @@ func newBenchRouter(b *testing.B) http.Handler {
 	b.Helper()
 	metrics, gatherer := platform.NewMetrics("bench_http")
 	tm := topicmanager.New(0)
-	gw := websocket.NewGateway(tm, zerolog.Nop(), metrics)
+	gw := websocket.NewGateway(tm, zerolog.Nop(), metrics, 100.0)
 	cfg := &config.Config{
 		Metrics: config.MetricsConfig{Enabled: true, Path: "/metrics"},
 	}
-	return NewRouter(cfg, gw, zerolog.Nop(), metrics, gatherer, &benchHealthReporter{})
+	return NewRouter(cfg, gw, zerolog.Nop(), metrics, gatherer, &benchHealthReporter{}, nil)
 }
 
 // ---------- Health Endpoint ----------

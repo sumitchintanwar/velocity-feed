@@ -1,0 +1,6 @@
+CONTAINER ID   NAME                CPU %     MEM USAGE / LIMIT     MEM %     NET I/O           BLOCK I/O     PIDS
+a6b2b2098345   rtmds-bench-nginx   0.00%     18.43MiB / 15.49GiB   0.12%     10.9kB / 9.55kB   0B / 12.3kB   9
+d8b647ad37ca   rtmds-bench-gw3     0.05%     3.254MiB / 512MiB     0.64%     7kB / 11.4kB      0B / 0B       7
+d7f707976285   rtmds-bench-gw1     0.21%     6.75MiB / 512MiB      1.32%     121kB / 634kB     0B / 0B       8
+283ec5995f79   rtmds-bench-gw2     0.04%     3.363MiB / 512MiB     0.66%     7.08kB / 11.4kB   0B / 0B       7
+3fd6dd398911   rtmds-bench-redis   0.57%     4.383MiB / 15.49GiB   0.03%     643kB / 127kB     0B / 0B       6

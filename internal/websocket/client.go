@@ -11,6 +11,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
 )
 
@@ -42,10 +43,11 @@ const (
 // Clients are isolated — a slow consumer cannot block other clients
 // or the publish hot path.
 type Client struct {
-	id   string
-	conn *websocket.Conn
-	tm   topicmanager.Manager
-	log  zerolog.Logger
+	id      string
+	conn    *websocket.Conn
+	tm      topicmanager.Manager
+	log     zerolog.Logger
+	metrics *platform.Metrics
 
 	// control is a channel for control messages (errors, confirmations)
 	// from readPump to writePump. This ensures all socket writes
@@ -73,14 +75,18 @@ type Client struct {
 
 	// SC1: consecutive drops counter for slow consumer detection.
 	consecutiveDrops atomic.Int64
+
+	// lastPingSent records when the last ping was sent for RTT measurement.
+	lastPingSent atomic.Int64 // unix nanoseconds
 }
 
-func newClient(id string, conn *websocket.Conn, tm topicmanager.Manager, log zerolog.Logger, cancelCtx context.CancelFunc) *Client {
+func newClient(id string, conn *websocket.Conn, tm topicmanager.Manager, log zerolog.Logger, cancelCtx context.CancelFunc, metrics *platform.Metrics) *Client {
 	return &Client{
 		id:         id,
 		conn:       conn,
 		tm:         tm,
 		log:        log,
+		metrics:    metrics,
 		control:    make(chan ServerMessage, controlQueueSize),
 		subUpdated: make(chan struct{}, 1),
 		cancelCtx:  cancelCtx,
@@ -106,6 +112,11 @@ func (c *Client) readPump(ctx context.Context) {
 	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
 	c.conn.SetPongHandler(func(string) error {
 		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+		// Record ping RTT if a ping was recently sent.
+		if sent := c.lastPingSent.Load(); sent > 0 {
+			rtt := time.Since(time.Unix(0, sent))
+			c.metrics.WSPingLatency.Observe(rtt.Seconds())
+		}
 		return nil
 	})
 
@@ -148,8 +159,10 @@ func (c *Client) handleMessage(cm ClientMessage) {
 		c.handleMu.Lock()
 		if c.handle != nil {
 			c.handle.Cancel()
+			c.metrics.WSActiveSubscriptions.Dec()
 		}
 		c.handle = c.tm.Subscribe(c.id, cm.Symbols...)
+		c.metrics.WSActiveSubscriptions.Inc()
 		c.handleMu.Unlock()
 		// Signal writePump to pick up the new handle.
 		select {
@@ -164,6 +177,7 @@ func (c *Client) handleMessage(cm ClientMessage) {
 		if c.handle != nil {
 			c.handle.Cancel()
 			c.handle = nil
+			c.metrics.WSActiveSubscriptions.Dec()
 		}
 		c.handleMu.Unlock()
 		select {
@@ -183,6 +197,9 @@ func (c *Client) handleMessage(cm ClientMessage) {
 // It multiplexes: market events (from handle), control messages (from
 // readPump), pings, and shutdown signals.
 //
+// Uses pre-encoded JSON bytes from *CachedEvent when available,
+// eliminating redundant JSON serialization per-client.
+//
 // GL3: writePump owns the connection and closes it on exit.
 func (c *Client) writePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
@@ -192,7 +209,7 @@ func (c *Client) writePump(ctx context.Context) {
 		_ = c.conn.Close()
 	}()
 
-	var eventC <-chan marketdata.MarketEvent
+	var eventC <-chan *marketdata.CachedEvent
 	var doneC <-chan struct{}
 
 	// Snapshot handle under read lock.
@@ -220,19 +237,27 @@ func (c *Client) writePump(ctx context.Context) {
 				doneC = nil
 			}
 
-		case ev, ok := <-eventC:
+		case cached, ok := <-eventC:
 			if !ok {
 				eventC = nil
 				doneC = nil
 				continue
 			}
-			env := ServerMessage{Type: ev.EventType(), Payload: ev}
-			if err := c.writeJSON(env); err != nil {
+			// Record end-to-end delivery latency from event timestamp.
+			if te, ok := cached.Event.(interface{ GetTimestamp() time.Time }); ok {
+				latency := time.Since(te.GetTimestamp())
+				c.metrics.WSDeliveryLatency.Observe(latency.Seconds())
+			}
+			// Use pre-encoded bytes from CachedEvent — zero serialization overhead.
+			if err := c.writeRaw(cached.EncodedMsg); err != nil {
 				c.log.Error().Err(err).Msg("write error")
+				c.metrics.WSWriteErrors.Inc()
 				return
 			}
+			c.metrics.WSMessagesWritten.Inc()
 			// SC1: Reset drop counter on successful write.
 			c.consecutiveDrops.Store(0)
+			c.metrics.WSSlowConsumers.Dec()
 
 		case msg := <-c.control:
 			if err := c.writeJSON(msg); err != nil {
@@ -251,6 +276,7 @@ func (c *Client) writePump(ctx context.Context) {
 			return
 
 		case <-ticker.C:
+			c.lastPingSent.Store(time.Now().UnixNano())
 			if err := c.conn.WriteControl(
 				websocket.PingMessage,
 				nil,
@@ -265,8 +291,23 @@ func (c *Client) writePump(ctx context.Context) {
 
 // ---------- Helpers ----------
 
+// writeRaw writes pre-encoded JSON bytes directly to the WebSocket.
+// This is the hot path for market events — zero serialization overhead.
+// Tracks bytes_sent_total and message_size_bytes for bandwidth observability.
+func (c *Client) writeRaw(data []byte) error {
+	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
+	err := c.conn.WriteMessage(websocket.TextMessage, data)
+	if err == nil {
+		n := len(data)
+		c.metrics.WSBytesSent.Add(float64(n))
+		c.metrics.WSMessageSize.Observe(float64(n))
+	}
+	return err
+}
+
 // writeJSON writes a JSON message to the WebSocket with a deadline.
 // Uses a pooled buffer to reduce allocations on the hot path.
+// Used for control messages (subscribe/unsubscribe confirmations, errors).
 func (c *Client) writeJSON(v any) error {
 	_ = c.conn.SetWriteDeadline(time.Now().Add(writeWait))
 

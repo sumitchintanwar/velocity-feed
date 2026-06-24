@@ -34,6 +34,9 @@ func (q Quote) EventSymbol() string { return q.Symbol }
 // EventType implements MarketEvent.
 func (q Quote) EventType() string { return string(q.Type) }
 
+// GetTimestamp returns the quote timestamp for max-age filtering.
+func (q Quote) GetTimestamp() time.Time { return q.Timestamp }
+
 // Bar represents an OHLCV bar for a symbol.
 type Bar struct {
 	Symbol    string    `json:"symbol"`
@@ -51,6 +54,9 @@ func (b Bar) EventSymbol() string { return b.Symbol }
 
 // EventType implements MarketEvent.
 func (b Bar) EventType() string { return "bar" }
+
+// GetTimestamp returns the bar timestamp for max-age filtering.
+func (b Bar) GetTimestamp() time.Time { return b.Timestamp }
 
 // SubscribeRequest is the message a client sends to subscribe to symbols.
 type SubscribeRequest struct {

@@ -83,7 +83,7 @@ func BenchmarkPipeline_100Symbols(b *testing.B) {
 func benchPipeline(b *testing.B, symbols []string) {
 	f := &benchFeed{symbols: symbols}
 	pub := &benchPublisher{}
-	p := NewPipeline(f, pub, zerolog.Nop())
+	p := NewPipeline(f, pub, zerolog.Nop(), nil)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -139,7 +139,7 @@ func benchPipelineWithBus(b *testing.B, numSubs int) {
 		}()
 	}
 
-	p := NewPipeline(f, bus, zerolog.Nop())
+	p := NewPipeline(f, bus, zerolog.Nop(), nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -187,7 +187,7 @@ func BenchmarkPipeline_Scaling(b *testing.B) {
 				}()
 			}
 
-			p := NewPipeline(f, bus, zerolog.Nop())
+			p := NewPipeline(f, bus, zerolog.Nop(), nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
 			done := make(chan struct{})

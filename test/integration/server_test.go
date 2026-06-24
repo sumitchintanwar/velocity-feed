@@ -40,13 +40,13 @@ func buildTestServer(t *testing.T) (wsURL string, tm topicmanager.Manager, cance
 	metrics, gatherer := platform.NewMetrics("test")
 
 	tm = topicmanager.New(0)
-	gw := websocket.NewGateway(tm, log, metrics)
+	gw := websocket.NewGateway(tm, log, metrics, 0)
 
 	cfg := &config.Config{
 		Metrics: config.MetricsConfig{Enabled: false},
 	}
 
-	router := transport.NewRouter(cfg, gw, log, metrics, gatherer, &mockHealthReporter{})
+	router := transport.NewRouter(cfg, gw, log, metrics, gatherer, &mockHealthReporter{}, nil)
 	ts := httptest.NewServer(router)
 	t.Cleanup(ts.Close)
 

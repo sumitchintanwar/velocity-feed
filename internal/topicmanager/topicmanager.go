@@ -28,7 +28,8 @@ type Topic = string
 type Handle interface {
 	// C returns the channel on which events are delivered. It is NEVER
 	// closed. Use Done() to detect cancellation.
-	C() <-chan marketdata.MarketEvent
+	// Events are *CachedEvent with pre-encoded JSON bytes for zero-copy writes.
+	C() <-chan *marketdata.CachedEvent
 
 	// Done returns a channel that is closed when the subscription is
 	// cancelled. Select on this alongside C() to detect termination.

@@ -1,0 +1,10 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rtmds-server-pdb
+  namespace: rtmds
+spec:
+  minAvailable: 66%
+  selector:
+    matchLabels:
+      app: rtmds-server

@@ -1,0 +1,59 @@
+# .golangci.yml
+# Production-grade static analysis configuration for RTMDS
+
+run:
+  timeout: 5m
+  tests: true
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - fieldalignment # Often too noisy for structs where padding isn't critical
+  gocyclo:
+    min-complexity: 15
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+  gocritic:
+    # Only stable tag categories. The 'experimental' tag is excluded because
+    # it changes behaviour across patch releases, causing non-deterministic CI failures.
+    enabled-tags:
+      - performance
+      - style
+      - diagnostic
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+
+linters:
+  disable-all: true
+  enable:
+    # Default correctness linters
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - staticcheck
+    - typecheck
+    - unused
+    
+    # Maintainability and Code Quality
+    - gocyclo
+    - gocognit
+    - goconst
+    - gocritic
+    - gosec
+    - revive
+    
+    # Performance
+    - prealloc
+
+issues:
+  exclude-rules:
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - gosec
+        - gocognit

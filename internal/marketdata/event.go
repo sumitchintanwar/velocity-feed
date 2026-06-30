@@ -1,5 +1,7 @@
 package marketdata
 
+import "time"
+
 // MarketEvent is the base abstraction for all events flowing through the
 // Publisher Service. The distribution layer routes events by Symbol and
 // does not need to know the concrete type. Specific event implementations
@@ -15,4 +17,14 @@ type MarketEvent interface {
 	// EventType returns a discriminator string (e.g. "trade", "bar",
 	// "order_book"). Consumers use this to decide how to handle the event.
 	EventType() string
+}
+
+// SequencedEvent is an event that carries a sequence number for ordering validation.
+type SequencedEvent interface {
+	GetSeq() int64
+}
+
+// TimestampedEvent is an event that carries a timestamp for max-age filtering and latency tracking.
+type TimestampedEvent interface {
+	GetTimestamp() time.Time
 }

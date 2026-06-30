@@ -1,0 +1,970 @@
+=== RUN   TestConcurrentSymbols
+--- PASS: TestConcurrentSymbols (2.98s)
+=== RUN   TestMissingTicks
+--- PASS: TestMissingTicks (0.03s)
+=== RUN   TestWindowRollover
+--- PASS: TestWindowRollover (0.05s)
+=== RUN   TestStagnantSweeper
+--- PASS: TestStagnantSweeper (0.00s)
+=== RUN   TestOHLCAggregator
+--- PASS: TestOHLCAggregator (0.00s)
+=== RUN   TestVWAPAggregator
+--- PASS: TestVWAPAggregator (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/aggregation	13.423s
+=== RUN   TestPool_ProcessesAllEvents
+{"level":"info","service":"test","workers":4,"queue_capacity":256,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":100,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_ProcessesAllEvents (0.00s)
+=== RUN   TestPool_ZeroEvents
+{"level":"info","service":"test","workers":8,"queue_capacity":4096,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":0,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_ZeroEvents (0.00s)
+=== RUN   TestPool_DropsWhenQueueFull
+--- PASS: TestPool_DropsWhenQueueFull (0.00s)
+=== RUN   TestPool_ConcurrentEnqueue
+{"level":"info","service":"test","workers":4,"queue_capacity":1024,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":100,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_ConcurrentEnqueue (0.00s)
+=== RUN   TestPool_ShutdownDrainsQueue
+{"level":"info","service":"test","workers":2,"queue_capacity":64,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":50,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_ShutdownDrainsQueue (0.00s)
+=== RUN   TestPool_ShutdownTimeout
+{"level":"info","service":"test","workers":1,"queue_capacity":1,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"warn","service":"test","event":"worker_pool_shutdown_timeout","time":"2026-06-28T11:11:56+05:30","message":"worker pool shutdown timed out"}
+--- PASS: TestPool_ShutdownTimeout (0.12s)
+=== RUN   TestPool_EnqueueAfterShutdown
+{"level":"info","service":"test","workers":8,"queue_capacity":4096,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":0,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_EnqueueAfterShutdown (0.00s)
+=== RUN   TestPool_WorkerRecoversFromPanic
+{"level":"info","service":"test","workers":1,"queue_capacity":64,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"error","service":"test","worker":0,"panic":"test panic","event":"worker_panic_recovered","time":"2026-06-28T11:11:56+05:30","message":"worker panic recovered"}
+{"level":"info","service":"test","processed":2,"dropped":0,"panics":1,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_WorkerRecoversFromPanic (0.06s)
+=== RUN   TestPool_StatsAccurate
+{"level":"info","service":"test","workers":2,"queue_capacity":256,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":200,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_StatsAccurate (0.00s)
+=== RUN   TestDefaultConfig
+--- PASS: TestDefaultConfig (0.00s)
+=== RUN   TestPool_DoubleShutdown
+{"level":"info","service":"test","workers":8,"queue_capacity":4096,"event":"worker_pool_started","time":"2026-06-28T11:11:56+05:30","message":"worker pool started"}
+{"level":"info","service":"test","processed":1,"dropped":0,"panics":0,"event":"worker_pool_shut_down","time":"2026-06-28T11:11:56+05:30","message":"worker pool shut down"}
+--- PASS: TestPool_DoubleShutdown (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/workerpool	10.391s
+=== RUN   TestParsePolicy
+=== RUN   TestParsePolicy/drop_oldest
+=== RUN   TestParsePolicy/drop-oldest
+=== RUN   TestParsePolicy/oldest
+=== RUN   TestParsePolicy/drop_newest
+=== RUN   TestParsePolicy/drop-newest
+=== RUN   TestParsePolicy/newest
+=== RUN   TestParsePolicy/disconnect
+=== RUN   TestParsePolicy/invalid
+=== RUN   TestParsePolicy/#00
+--- PASS: TestParsePolicy (0.00s)
+    --- PASS: TestParsePolicy/drop_oldest (0.00s)
+    --- PASS: TestParsePolicy/drop-oldest (0.00s)
+    --- PASS: TestParsePolicy/oldest (0.00s)
+    --- PASS: TestParsePolicy/drop_newest (0.00s)
+    --- PASS: TestParsePolicy/drop-newest (0.00s)
+    --- PASS: TestParsePolicy/newest (0.00s)
+    --- PASS: TestParsePolicy/disconnect (0.00s)
+    --- PASS: TestParsePolicy/invalid (0.00s)
+    --- PASS: TestParsePolicy/#00 (0.00s)
+=== RUN   TestPolicyString
+--- PASS: TestPolicyString (0.00s)
+=== RUN   TestConfigValidate
+=== RUN   TestConfigValidate/valid_drop_oldest
+=== RUN   TestConfigValidate/valid_disconnect
+=== RUN   TestConfigValidate/zero_buffer
+=== RUN   TestConfigValidate/disconnect_no_max_drops
+=== RUN   TestConfigValidate/threshold_out_of_range
+--- PASS: TestConfigValidate (0.00s)
+    --- PASS: TestConfigValidate/valid_drop_oldest (0.00s)
+    --- PASS: TestConfigValidate/valid_disconnect (0.00s)
+    --- PASS: TestConfigValidate/zero_buffer (0.00s)
+    --- PASS: TestConfigValidate/disconnect_no_max_drops (0.00s)
+    --- PASS: TestConfigValidate/threshold_out_of_range (0.00s)
+=== RUN   TestRing_PushPop
+--- PASS: TestRing_PushPop (0.00s)
+=== RUN   TestRing_DropOldest
+--- PASS: TestRing_DropOldest (0.00s)
+=== RUN   TestRing_EmptyPop
+--- PASS: TestRing_EmptyPop (0.00s)
+=== RUN   TestRing_Cap
+--- PASS: TestRing_Cap (0.00s)
+=== RUN   TestRing_Nil
+--- PASS: TestRing_Nil (0.00s)
+=== RUN   TestChannel_DropOldest
+--- PASS: TestChannel_DropOldest (0.00s)
+=== RUN   TestChannel_DropOldest_DeliversInOrder
+--- PASS: TestChannel_DropOldest_DeliversInOrder (0.00s)
+=== RUN   TestChannel_DropOldest_Concurrent
+    channel_test.go:293: TotalDropped=264269
+--- PASS: TestChannel_DropOldest_Concurrent (1.29s)
+=== RUN   TestChannel_DropNewest
+--- PASS: TestChannel_DropNewest (0.00s)
+=== RUN   TestChannel_DropNewest_Concurrent
+    channel_test.go:366: TotalDropped=79936
+--- PASS: TestChannel_DropNewest_Concurrent (1.02s)
+=== RUN   TestChannel_Disconnect_ConsecutiveDrops
+--- PASS: TestChannel_Disconnect_ConsecutiveDrops (0.12s)
+=== RUN   TestChannel_Disconnect_NoDisconnectBelowThreshold
+--- PASS: TestChannel_Disconnect_NoDisconnectBelowThreshold (0.06s)
+=== RUN   TestChannel_ResetDrops
+--- PASS: TestChannel_ResetDrops (0.12s)
+=== RUN   TestChannel_Close
+--- PASS: TestChannel_Close (0.00s)
+=== RUN   TestChannel_CloseIdempotent
+--- PASS: TestChannel_CloseIdempotent (0.00s)
+=== RUN   TestMetrics_EventsDroppedTotal
+--- PASS: TestMetrics_EventsDroppedTotal (0.00s)
+=== RUN   TestSim_DropOldest
+    sim_test.go:120: Policy: DropOldest
+    sim_test.go:121:   Sent:       ~200000 (10 producers × 10000/s × 2s)
+    sim_test.go:122:   Received:   234
+    sim_test.go:123:   Dropped:    3611
+    sim_test.go:124:   Drop ratio: 93.9%
+--- PASS: TestSim_DropOldest (2.65s)
+=== RUN   TestSim_DropNewest
+    sim_test.go:160: Policy: DropNewest
+    sim_test.go:161:   Received:   259
+    sim_test.go:162:   Dropped:    13140
+    sim_test.go:163:   Drop ratio: 98.1%
+--- PASS: TestSim_DropNewest (2.65s)
+=== RUN   TestSim_Disconnect
+    sim_test.go:177:   Disconnect reason: sustained drop rate exceeded
+    sim_test.go:203: Policy: Disconnect
+    sim_test.go:204:   Received:     243
+    sim_test.go:205:   Dropped:      7160
+    sim_test.go:206:   Disconnected: true
+--- PASS: TestSim_Disconnect (2.65s)
+=== RUN   TestSim_Ordering
+    sim_test.go:274: Ordering test: lastSeq=1706, outOfOrder=0
+--- PASS: TestSim_Ordering (2.06s)
+PASS
+ok  	github.com/sumit/rtmds/internal/backpressure	27.150s
+=== RUN   TestLoad_FastClient
+    load_test.go:41: Skipping load test on Windows due to timer resolution issues
+--- SKIP: TestLoad_FastClient (0.00s)
+=== RUN   TestLoad_SlowClient
+    load_test.go:115: Skipping load test on Windows due to timer resolution issues
+--- SKIP: TestLoad_SlowClient (0.00s)
+=== RUN   TestLoad_DisconnectedClient
+    load_test.go:194: Skipping load test on Windows due to timer resolution issues
+--- SKIP: TestLoad_DisconnectedClient (0.00s)
+=== RUN   TestLoad_MixedClients
+    load_test.go:279: Skipping load test on Windows due to timer resolution issues
+--- SKIP: TestLoad_MixedClients (0.00s)
+=== RUN   TestLoad_BurstAbsorption
+    load_test.go:411: Skipping load test on Windows due to timer resolution issues
+--- SKIP: TestLoad_BurstAbsorption (0.00s)
+=== RUN   TestQueue_SendReceive
+--- PASS: TestQueue_SendReceive (0.00s)
+=== RUN   TestQueue_DropOldest
+--- PASS: TestQueue_DropOldest (0.00s)
+=== RUN   TestQueue_DropNewest
+--- PASS: TestQueue_DropNewest (0.00s)
+=== RUN   TestQueue_Disconnect
+--- PASS: TestQueue_Disconnect (0.12s)
+=== RUN   TestQueue_Close
+--- PASS: TestQueue_Close (0.00s)
+=== RUN   TestQueue_CloseIdempotent
+--- PASS: TestQueue_CloseIdempotent (0.00s)
+=== RUN   TestQueue_ResetDrops
+--- PASS: TestQueue_ResetDrops (0.02s)
+=== RUN   TestQueue_ID
+--- PASS: TestQueue_ID (0.00s)
+=== RUN   TestQueue_Config
+--- PASS: TestQueue_Config (0.00s)
+=== RUN   TestQueue_Metrics
+--- PASS: TestQueue_Metrics (0.00s)
+=== RUN   TestManager_Create
+--- PASS: TestManager_Create (0.01s)
+=== RUN   TestManager_Get
+--- PASS: TestManager_Get (0.00s)
+=== RUN   TestManager_GetMissing
+--- PASS: TestManager_GetMissing (0.00s)
+=== RUN   TestManager_Remove
+--- PASS: TestManager_Remove (0.00s)
+=== RUN   TestManager_Snapshot
+--- PASS: TestManager_Snapshot (0.00s)
+=== RUN   TestManager_Replace
+--- PASS: TestManager_Replace (0.00s)
+=== RUN   TestManager_AggregateStats
+--- PASS: TestManager_AggregateStats (0.00s)
+=== RUN   TestManager_CloseAll
+--- PASS: TestManager_CloseAll (0.00s)
+=== RUN   TestQueue_Concurrent
+    queue_test.go:358: TotalDropped=10785, enqueued=8000, sent=8000
+--- PASS: TestQueue_Concurrent (0.27s)
+=== RUN   TestManager_Concurrent
+--- PASS: TestManager_Concurrent (0.14s)
+PASS
+ok  	github.com/sumit/rtmds/internal/clientqueue	9.326s
+=== RUN   TestPublish_DeliveredToSubscriber
+--- PASS: TestPublish_DeliveredToSubscriber (0.01s)
+=== RUN   TestPublish_NotDeliveredToWrongSymbol
+--- PASS: TestPublish_NotDeliveredToWrongSymbol (0.12s)
+=== RUN   TestPublish_FanOutToMultipleSubscribers
+--- PASS: TestPublish_FanOutToMultipleSubscribers (0.01s)
+=== RUN   TestCancel_ClosesChannel
+--- PASS: TestCancel_ClosesChannel (0.01s)
+=== RUN   TestSnapshot_NewSubscriberGetsLastValue
+--- PASS: TestSnapshot_NewSubscriberGetsLastValue (0.09s)
+=== RUN   TestSnapshot_UpdatedBeforeEachDelivery
+--- PASS: TestSnapshot_UpdatedBeforeEachDelivery (0.00s)
+=== RUN   TestCancel_Idempotent
+--- PASS: TestCancel_Idempotent (0.00s)
+=== RUN   TestPublish_AfterCancel_SkipsSilently
+--- PASS: TestPublish_AfterCancel_SkipsSilently (0.74s)
+=== RUN   TestConcurrent_PublishAndCancel
+--- PASS: TestConcurrent_PublishAndCancel (0.01s)
+=== RUN   TestConcurrent_MultiplePublishers
+--- PASS: TestConcurrent_MultiplePublishers (0.03s)
+=== RUN   TestMemoryBus_ImplementsBus
+--- PASS: TestMemoryBus_ImplementsBus (0.00s)
+=== RUN   TestMemorySub_ImplementsSubscription
+--- PASS: TestMemorySub_ImplementsSubscription (0.00s)
+=== RUN   TestRun_DrainsChannel
+--- PASS: TestRun_DrainsChannel (0.00s)
+=== RUN   TestRun_StopsOnContext
+--- PASS: TestRun_StopsOnContext (0.01s)
+=== RUN   TestPublish_IncrementsBroadcastsTotal
+--- PASS: TestPublish_IncrementsBroadcastsTotal (0.04s)
+=== RUN   TestPublish_DropPath_IncrementsDropped
+--- PASS: TestPublish_DropPath_IncrementsDropped (0.02s)
+PASS
+ok  	github.com/sumit/rtmds/internal/pubsub	9.893s
+=== RUN   TestPipeline_PublishesAllQuotes
+{"level":"info","service":"test","feed":"mock","event":"pipeline_started","time":"2026-06-28T11:12:14+05:30","message":"pipeline started"}
+{"level":"info","service":"test","event":"pipeline_feed_closed","time":"2026-06-28T11:12:14+05:30","message":"pipeline: feed channel closed"}
+--- PASS: TestPipeline_PublishesAllQuotes (0.00s)
+=== RUN   TestPipeline_StopOnContext
+{"level":"info","service":"test","feed":"mock","event":"pipeline_started","time":"2026-06-28T11:12:14+05:30","message":"pipeline started"}
+{"level":"info","service":"test","event":"pipeline_shutting_down","time":"2026-06-28T11:12:14+05:30","message":"pipeline: shutting down"}
+--- PASS: TestPipeline_StopOnContext (0.01s)
+=== RUN   TestPipeline_FeedErrorReturned
+--- PASS: TestPipeline_FeedErrorReturned (0.00s)
+=== RUN   TestPipeline_PublisherReceivesFeedOutput
+{"level":"info","service":"test","feed":"mock","event":"pipeline_started","time":"2026-06-28T11:12:14+05:30","message":"pipeline started"}
+{"level":"info","service":"test","event":"pipeline_feed_closed","time":"2026-06-28T11:12:14+05:30","message":"pipeline: feed channel closed"}
+--- PASS: TestPipeline_PublisherReceivesFeedOutput (0.00s)
+=== RUN   TestPipeline_PublisherErrorDoesNotCrash
+{"level":"info","service":"test","feed":"mock","event":"pipeline_started","time":"2026-06-28T11:12:14+05:30","message":"pipeline started"}
+{"level":"info","service":"test","event":"pipeline_feed_closed","time":"2026-06-28T11:12:14+05:30","message":"pipeline: feed channel closed"}
+--- PASS: TestPipeline_PublisherErrorDoesNotCrash (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/feed	10.744s
+=== RUN   TestHandleReplay_BasicQuery
+--- PASS: TestHandleReplay_BasicQuery (0.00s)
+=== RUN   TestHandleReplay_TimeRange
+--- PASS: TestHandleReplay_TimeRange (0.00s)
+=== RUN   TestHandleReplay_CursorPagination
+--- PASS: TestHandleReplay_CursorPagination (0.00s)
+=== RUN   TestHandleReplay_InvalidFromTime
+--- PASS: TestHandleReplay_InvalidFromTime (0.00s)
+=== RUN   TestHandleReplay_InvalidToTime
+--- PASS: TestHandleReplay_InvalidToTime (0.00s)
+=== RUN   TestHandleReplay_InvalidCursor
+--- PASS: TestHandleReplay_InvalidCursor (0.00s)
+=== RUN   TestHandleReplay_InvalidCursorMissingEventID
+--- PASS: TestHandleReplay_InvalidCursorMissingEventID (0.00s)
+=== RUN   TestHandleReplay_InvalidCursorBadEventID
+--- PASS: TestHandleReplay_InvalidCursorBadEventID (0.00s)
+=== RUN   TestHandleReplay_InvalidLimit
+--- PASS: TestHandleReplay_InvalidLimit (0.00s)
+=== RUN   TestHandleReplay_EmptyQuery
+--- PASS: TestHandleReplay_EmptyQuery (0.00s)
+=== RUN   TestHandleReplay_RepositoryError
+--- PASS: TestHandleReplay_RepositoryError (0.00s)
+=== RUN   TestHandleReplay_ConcurrencyLimiting
+--- PASS: TestHandleReplay_ConcurrencyLimiting (0.01s)
+=== RUN   TestHandleReplay_FullExample
+--- PASS: TestHandleReplay_FullExample (0.00s)
+=== RUN   TestParseCursor_Valid
+--- PASS: TestParseCursor_Valid (0.00s)
+=== RUN   TestParseCursor_InvalidFormat
+--- PASS: TestParseCursor_InvalidFormat (0.00s)
+=== RUN   TestParseCursor_InvalidTimestamp
+--- PASS: TestParseCursor_InvalidTimestamp (0.00s)
+=== RUN   TestParseCursor_InvalidEventID
+--- PASS: TestParseCursor_InvalidEventID (0.00s)
+=== RUN   TestHandleReplayExport_CSV
+--- PASS: TestHandleReplayExport_CSV (0.00s)
+=== RUN   TestHandleReplayExport_JSON
+--- PASS: TestHandleReplayExport_JSON (0.00s)
+=== RUN   TestHandleReplayExport_InvalidFormat
+--- PASS: TestHandleReplayExport_InvalidFormat (0.00s)
+=== RUN   TestHandleReplayExport_DefaultFormat
+--- PASS: TestHandleReplayExport_DefaultFormat (0.00s)
+=== RUN   TestHandleReplayExport_ConcurrencyLimiting
+--- PASS: TestHandleReplayExport_ConcurrencyLimiting (0.02s)
+=== RUN   TestHandleReplayExport_Pagination
+--- PASS: TestHandleReplayExport_Pagination (0.00s)
+=== RUN   TestConcurrencyLimiter_AcquireRelease
+--- PASS: TestConcurrencyLimiter_AcquireRelease (0.00s)
+=== RUN   TestConcurrencyLimiter_DifferentClients
+--- PASS: TestConcurrencyLimiter_DifferentClients (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/transport	1.613s
+=== RUN   TestOrderBookInsert
+--- PASS: TestOrderBookInsert (0.00s)
+=== RUN   TestOrderBookUpdateAndDelete
+--- PASS: TestOrderBookUpdateAndDelete (0.00s)
+=== RUN   TestSequenceValidation
+--- PASS: TestSequenceValidation (0.00s)
+=== RUN   TestManager
+--- PASS: TestManager (0.01s)
+=== RUN   TestZeroSizeDelete
+--- PASS: TestZeroSizeDelete (0.00s)
+=== RUN   TestMaxDepth
+--- PASS: TestMaxDepth (0.00s)
+=== RUN   TestConcurrentClients
+--- PASS: TestConcurrentClients (0.16s)
+PASS
+ok  	github.com/sumit/rtmds/internal/orderbook	4.365s
+=== RUN   TestSubscribe_DeliversEvents
+--- PASS: TestSubscribe_DeliversEvents (0.01s)
+=== RUN   TestSubscribe_MultipleTopics
+--- PASS: TestSubscribe_MultipleTopics (0.00s)
+=== RUN   TestSubscribe_WrongSymbolNotDelivered
+--- PASS: TestSubscribe_WrongSymbolNotDelivered (0.05s)
+=== RUN   TestSubscribe_Idempotent
+--- PASS: TestSubscribe_Idempotent (0.00s)
+=== RUN   TestSubscribe_MergeTopics_SameHandle
+--- PASS: TestSubscribe_MergeTopics_SameHandle (0.00s)
+=== RUN   TestUnsubscribe_DoneChannelClosed
+--- PASS: TestUnsubscribe_DoneChannelClosed (0.00s)
+=== RUN   TestUnsubscribe_Idempotent
+--- PASS: TestUnsubscribe_Idempotent (0.00s)
+=== RUN   TestUnsubscribe_NoMoreEventsAfter
+--- PASS: TestUnsubscribe_NoMoreEventsAfter (0.00s)
+=== RUN   TestUnsubscribe_OtherSubscribersUnaffected
+--- PASS: TestUnsubscribe_OtherSubscribersUnaffected (0.00s)
+=== RUN   TestUnsubscribe_TopicCountCleanup
+--- PASS: TestUnsubscribe_TopicCountCleanup (0.00s)
+=== RUN   TestPublish_FanOut
+--- PASS: TestPublish_FanOut (0.00s)
+=== RUN   TestPublish_DropOnFull
+--- PASS: TestPublish_DropOnFull (0.00s)
+=== RUN   TestPublish_NoEventsForEmptyTopic
+--- PASS: TestPublish_NoEventsForEmptyTopic (0.05s)
+=== RUN   TestPublish_SnapshotIsolation
+--- PASS: TestPublish_SnapshotIsolation (0.00s)
+=== RUN   TestSubscriberCount
+--- PASS: TestSubscriberCount (0.00s)
+=== RUN   TestTopicCount
+--- PASS: TestTopicCount (0.00s)
+=== RUN   TestTopics
+--- PASS: TestTopics (0.00s)
+=== RUN   TestConcurrent_PublishAndSubscribe
+--- PASS: TestConcurrent_PublishAndSubscribe (0.06s)
+=== RUN   TestConcurrent_ManyPublishersOneTopic
+--- PASS: TestConcurrent_ManyPublishersOneTopic (1.20s)
+=== RUN   TestConcurrent_SubscribeUnsubscribeCycle
+--- PASS: TestConcurrent_SubscribeUnsubscribeCycle (0.01s)
+=== RUN   TestMemoryManager_ImplementsManager
+--- PASS: TestMemoryManager_ImplementsManager (0.00s)
+=== RUN   TestNextPowerOf2
+--- PASS: TestNextPowerOf2 (0.00s)
+=== RUN   TestDistributedRouter_SubscribeFirstClientTriggersRedis
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+--- PASS: TestDistributedRouter_SubscribeFirstClientTriggersRedis (0.00s)
+=== RUN   TestDistributedRouter_LastUnsubscribeTriggersRedisUnsubscribe
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_LastUnsubscribeTriggersRedisUnsubscribe (0.00s)
+=== RUN   TestDistributedRouter_MultipleSymbols
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"GOOG","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"GOOG","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_MultipleSymbols (0.00s)
+=== RUN   TestDistributedRouter_PublishRoutesLocally
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+--- PASS: TestDistributedRouter_PublishRoutesLocally (0.00s)
+=== RUN   TestDistributedRouter_NeedsSymbol
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_NeedsSymbol (0.00s)
+=== RUN   TestDistributedRouter_SubscriberCount
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+--- PASS: TestDistributedRouter_SubscriberCount (0.00s)
+=== RUN   TestDistributedRouter_Subscribers
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"GOOG","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+--- PASS: TestDistributedRouter_Subscribers (0.00s)
+=== RUN   TestDistributedRouter_EventsRouted
+--- PASS: TestDistributedRouter_EventsRouted (0.00s)
+=== RUN   TestDistributedRouter_ConcurrentSubscribeUnsubscribe
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_ConcurrentSubscribeUnsubscribe (0.03s)
+=== RUN   TestDistributedRouter_ShardsReduceContention
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"GOOG","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AMZN","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"TSLA","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"NVDA","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"META","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"NFLX","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"GOOG","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"AMZN","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"TSLA","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"NVDA","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"META","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"NFLX","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_ShardsReduceContention (0.00s)
+=== RUN   TestDistributedRouter_Reconcile
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_Reconcile (0.00s)
+=== RUN   TestDistributedRouter_SymbolToRedisChannel
+--- PASS: TestDistributedRouter_SymbolToRedisChannel (0.00s)
+=== RUN   TestTopicGroups
+--- PASS: TestTopicGroups (0.00s)
+=== RUN   TestDistributedRouter_TopicCount
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_subscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: first local subscriber → subscribing to Redis"}
+{"level":"info","service":"test","symbol":"AAPL","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+{"level":"info","service":"test","symbol":"MSFT","gateway":"gateway-test","event":"redis_unsubscribe_requested","time":"2026-06-28T11:12:17+05:30","message":"distributed: last subscriber left → unsubscribing from Redis"}
+--- PASS: TestDistributedRouter_TopicCount (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/topicmanager	9.852s
+=== RUN   TestPipeline_Normalize
+=== RUN   TestPipeline_Normalize/Valid_quote_passes
+=== RUN   TestPipeline_Normalize/Invalid_quote_fails_validation
+{"level":"warn","service":"test","error":"invalid price: -10.000000","symbol":"BTC-USD","provider":"test","time":"2026-06-28T11:12:10+05:30","message":"Validation failed"}
+=== RUN   TestPipeline_Normalize/Mapper_error_propagates
+{"level":"warn","service":"test","error":"nil payload","provider":"test","time":"2026-06-28T11:12:10+05:30","message":"Mapping failed"}
+--- PASS: TestPipeline_Normalize (0.00s)
+    --- PASS: TestPipeline_Normalize/Valid_quote_passes (0.00s)
+    --- PASS: TestPipeline_Normalize/Invalid_quote_fails_validation (0.00s)
+    --- PASS: TestPipeline_Normalize/Mapper_error_propagates (0.00s)
+=== RUN   TestDefaultValidator
+=== RUN   TestDefaultValidator/Valid_Trade
+=== RUN   TestDefaultValidator/Valid_Quote
+=== RUN   TestDefaultValidator/Missing_Symbol
+=== RUN   TestDefaultValidator/Zero_Price
+=== RUN   TestDefaultValidator/Negative_Volume_for_Trade
+=== RUN   TestDefaultValidator/Missing_Timestamp
+--- PASS: TestDefaultValidator (0.00s)
+    --- PASS: TestDefaultValidator/Valid_Trade (0.00s)
+    --- PASS: TestDefaultValidator/Valid_Quote (0.00s)
+    --- PASS: TestDefaultValidator/Missing_Symbol (0.00s)
+    --- PASS: TestDefaultValidator/Zero_Price (0.00s)
+    --- PASS: TestDefaultValidator/Negative_Volume_for_Trade (0.00s)
+    --- PASS: TestDefaultValidator/Missing_Timestamp (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/normalization	3.224s
+=== RUN   TestGateway_ConnectAndDisconnect
+{"level":"info","service":"test","client_id":"0aaaf0dc-4cc4-4e82-8e17-4b8d4efc9289","remote":"127.0.0.1:60202","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"error","service":"test","client_id":"0aaaf0dc-4cc4-4e82-8e17-4b8d4efc9289","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"0aaaf0dc-4cc4-4e82-8e17-4b8d4efc9289","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+--- PASS: TestGateway_ConnectAndDisconnect (0.04s)
+=== RUN   TestGateway_MultipleConnections
+{"level":"info","service":"test","client_id":"a95fe062-1a53-4678-a11d-a75cdcc43184","remote":"127.0.0.1:60204","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"9d861794-ba8c-4dbd-af98-5fd1160d2e8f","remote":"127.0.0.1:60205","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"6d66992a-56b8-4e27-81c6-c9dec80dce42","remote":"127.0.0.1:60206","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"696ed2b0-4171-432d-983f-dc9e0476a075","remote":"127.0.0.1:60207","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"d67dd765-1772-4f80-9541-886eae9f421f","remote":"127.0.0.1:60208","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"8afffb1a-cd8e-487a-b0fc-a07152bf3760","remote":"127.0.0.1:60209","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"76bd17dd-5756-4594-8943-62581039040e","remote":"127.0.0.1:60210","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"5e1961e6-3637-4082-935f-07813a19b911","remote":"127.0.0.1:60211","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"dfad5570-8cb6-4b94-8742-a901093c154a","remote":"127.0.0.1:60212","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"925e2a54-c696-4809-a7cc-1580ce61f1f9","remote":"127.0.0.1:60213","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"error","service":"test","client_id":"76bd17dd-5756-4594-8943-62581039040e","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"76bd17dd-5756-4594-8943-62581039040e","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"5e1961e6-3637-4082-935f-07813a19b911","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"5e1961e6-3637-4082-935f-07813a19b911","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"8afffb1a-cd8e-487a-b0fc-a07152bf3760","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"8afffb1a-cd8e-487a-b0fc-a07152bf3760","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"a95fe062-1a53-4678-a11d-a75cdcc43184","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"error","service":"test","client_id":"d67dd765-1772-4f80-9541-886eae9f421f","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"d67dd765-1772-4f80-9541-886eae9f421f","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"info","service":"test","client_id":"a95fe062-1a53-4678-a11d-a75cdcc43184","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"6d66992a-56b8-4e27-81c6-c9dec80dce42","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"6d66992a-56b8-4e27-81c6-c9dec80dce42","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"9d861794-ba8c-4dbd-af98-5fd1160d2e8f","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"9d861794-ba8c-4dbd-af98-5fd1160d2e8f","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"696ed2b0-4171-432d-983f-dc9e0476a075","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"696ed2b0-4171-432d-983f-dc9e0476a075","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"925e2a54-c696-4809-a7cc-1580ce61f1f9","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"925e2a54-c696-4809-a7cc-1580ce61f1f9","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"dfad5570-8cb6-4b94-8742-a901093c154a","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"dfad5570-8cb6-4b94-8742-a901093c154a","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+--- PASS: TestGateway_MultipleConnections (0.08s)
+=== RUN   TestGateway_Subscribe
+{"level":"info","service":"test","client_id":"36153838-1350-4d47-88e3-d884a8a9c97f","remote":"127.0.0.1:60215","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"36153838-1350-4d47-88e3-d884a8a9c97f","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"36153838-1350-4d47-88e3-d884a8a9c97f","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+--- PASS: TestGateway_Subscribe (0.03s)
+{"level":"info","service":"test","client_id":"36153838-1350-4d47-88e3-d884a8a9c97f","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+=== RUN   TestGateway_SubscribeMultipleSymbols
+{"level":"info","service":"test","client_id":"0d305b69-2200-4cc0-83aa-10b78eb76ff9","remote":"127.0.0.1:60217","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"0d305b69-2200-4cc0-83aa-10b78eb76ff9","symbols":["AAPL","MSFT","GOOG"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+--- PASS: TestGateway_SubscribeMultipleSymbols (0.02s)
+{"level":"error","service":"test","client_id":"0d305b69-2200-4cc0-83aa-10b78eb76ff9","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+=== RUN   TestGateway_Unsubscribe
+{"level":"info","service":"test","client_id":"0d305b69-2200-4cc0-83aa-10b78eb76ff9","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"info","service":"test","client_id":"03bf575f-b9b6-4b31-84a8-6438f05941d9","remote":"127.0.0.1:60219","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"03bf575f-b9b6-4b31-84a8-6438f05941d9","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+--- PASS: TestGateway_Unsubscribe (0.03s)
+=== RUN   TestGateway_ResubscribeReplacesPrevious
+{"level":"error","service":"test","client_id":"03bf575f-b9b6-4b31-84a8-6438f05941d9","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"03bf575f-b9b6-4b31-84a8-6438f05941d9","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"info","service":"test","client_id":"027d7d73-3414-4a60-884a-b0010639a553","remote":"127.0.0.1:60221","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"027d7d73-3414-4a60-884a-b0010639a553","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"027d7d73-3414-4a60-884a-b0010639a553","symbols":["MSFT"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"027d7d73-3414-4a60-884a-b0010639a553","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"027d7d73-3414-4a60-884a-b0010639a553","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+--- PASS: TestGateway_ResubscribeReplacesPrevious (0.06s)
+=== RUN   TestGateway_EventDelivery
+{"level":"info","service":"test","client_id":"918c34c5-647d-47d0-9484-281201d14301","remote":"127.0.0.1:60223","event":"client_connected","time":"2026-06-28T11:12:08+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"918c34c5-647d-47d0-9484-281201d14301","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:08+05:30","message":"subscribed"}
+--- PASS: TestGateway_EventDelivery (0.02s)
+=== RUN   TestGateway_NoDeliveryForUnsubscribedTopic
+{"level":"error","service":"test","client_id":"918c34c5-647d-47d0-9484-281201d14301","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:08+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"918c34c5-647d-47d0-9484-281201d14301","event":"client_disconnected","time":"2026-06-28T11:12:08+05:30","message":"client disconnected"}
+{"level":"info","service":"test","client_id":"5517c146-7bbd-4349-b310-aca8c6cc5d44","remote":"127.0.0.1:60225","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"5517c146-7bbd-4349-b310-aca8c6cc5d44","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+--- PASS: TestGateway_NoDeliveryForUnsubscribedTopic (0.25s)
+{"level":"error","service":"test","client_id":"5517c146-7bbd-4349-b310-aca8c6cc5d44","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"5517c146-7bbd-4349-b310-aca8c6cc5d44","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+=== RUN   TestGateway_InvalidJSON
+{"level":"info","service":"test","client_id":"d4892a9e-2290-45a6-b61c-50bcef66fd0e","remote":"127.0.0.1:60227","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"warn","service":"test","client_id":"d4892a9e-2290-45a6-b61c-50bcef66fd0e","error":"invalid character 'o' in literal null (expecting 'u')","event":"invalid_message","time":"2026-06-28T11:12:09+05:30","message":"invalid message"}
+{"level":"error","service":"test","client_id":"d4892a9e-2290-45a6-b61c-50bcef66fd0e","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+--- PASS: TestGateway_InvalidJSON (0.01s)
+{"level":"info","service":"test","client_id":"d4892a9e-2290-45a6-b61c-50bcef66fd0e","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+=== RUN   TestGateway_EmptySymbols
+{"level":"info","service":"test","client_id":"4f5ae740-ef69-4ab2-80bb-7587a42f0cd6","remote":"127.0.0.1:60229","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"error","service":"test","client_id":"4f5ae740-ef69-4ab2-80bb-7587a42f0cd6","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"4f5ae740-ef69-4ab2-80bb-7587a42f0cd6","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+--- PASS: TestGateway_EmptySymbols (0.05s)
+=== RUN   TestGateway_UnknownAction
+{"level":"info","service":"test","client_id":"071983a8-1c4c-43cc-83fd-0a61e08615c5","remote":"127.0.0.1:60231","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"error","service":"test","client_id":"071983a8-1c4c-43cc-83fd-0a61e08615c5","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"071983a8-1c4c-43cc-83fd-0a61e08615c5","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+--- PASS: TestGateway_UnknownAction (0.03s)
+=== RUN   TestGateway_Shutdown
+{"level":"info","service":"test","client_id":"c1aee0ba-8306-4a65-965e-aa3b0c1564b6","remote":"127.0.0.1:60233","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"c012ec11-0948-493e-9699-43e71f86ae3c","remote":"127.0.0.1:60234","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"092e7848-5cae-4901-8910-09e5fa080b60","remote":"127.0.0.1:60235","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"6dc1601e-5183-41ec-8bda-e83d22ea1d0d","remote":"127.0.0.1:60236","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"7fdb607e-9b14-4a75-a2b1-874b92e27e04","remote":"127.0.0.1:60237","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","delay":192,"event":"gateway_draining","time":"2026-06-28T11:12:09+05:30","message":"gateway: starting graceful drain"}
+{"level":"error","service":"test","client_id":"7fdb607e-9b14-4a75-a2b1-874b92e27e04","error":"read tcp 127.0.0.1:60232->127.0.0.1:60237: use of closed network connection","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"7fdb607e-9b14-4a75-a2b1-874b92e27e04","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"c1aee0ba-8306-4a65-965e-aa3b0c1564b6","error":"read tcp 127.0.0.1:60232->127.0.0.1:60233: use of closed network connection","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"c1aee0ba-8306-4a65-965e-aa3b0c1564b6","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"c012ec11-0948-493e-9699-43e71f86ae3c","error":"read tcp 127.0.0.1:60232->127.0.0.1:60234: use of closed network connection","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"c012ec11-0948-493e-9699-43e71f86ae3c","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"6dc1601e-5183-41ec-8bda-e83d22ea1d0d","error":"read tcp 127.0.0.1:60232->127.0.0.1:60236: i/o timeout","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"6dc1601e-5183-41ec-8bda-e83d22ea1d0d","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"092e7848-5cae-4901-8910-09e5fa080b60","error":"read tcp 127.0.0.1:60232->127.0.0.1:60235: use of closed network connection","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"092e7848-5cae-4901-8910-09e5fa080b60","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+--- PASS: TestGateway_Shutdown (0.25s)
+=== RUN   TestGateway_ClientCount
+{"level":"info","service":"test","client_id":"ebea60a7-ca8e-40f8-b78b-733526af9a17","remote":"127.0.0.1:60239","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"cdfb390c-2d39-4296-974e-03605ba0c8ad","remote":"127.0.0.1:60240","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"error","service":"test","client_id":"ebea60a7-ca8e-40f8-b78b-733526af9a17","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"ebea60a7-ca8e-40f8-b78b-733526af9a17","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"cdfb390c-2d39-4296-974e-03605ba0c8ad","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"cdfb390c-2d39-4296-974e-03605ba0c8ad","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+--- PASS: TestGateway_ClientCount (0.07s)
+=== RUN   TestGateway_ConcurrentPublishAndSubscribe
+{"level":"info","service":"test","client_id":"2b49c4e6-f916-464f-bfff-bb9eb0510dff","remote":"127.0.0.1:60242","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"2b49c4e6-f916-464f-bfff-bb9eb0510dff","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"574cd193-67ea-4bef-8cf1-f00ee0953adc","remote":"127.0.0.1:60243","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"574cd193-67ea-4bef-8cf1-f00ee0953adc","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"a63109ae-c9de-400a-b98e-9b4a2481eb39","remote":"127.0.0.1:60244","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"a63109ae-c9de-400a-b98e-9b4a2481eb39","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"154c0cc3-d4a0-47c4-9589-145987ebad55","remote":"127.0.0.1:60245","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"154c0cc3-d4a0-47c4-9589-145987ebad55","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"6776027f-a279-4fe6-824e-de07e3093159","remote":"127.0.0.1:60246","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"6776027f-a279-4fe6-824e-de07e3093159","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"6b38b120-a030-48f4-8266-5b938f546d42","remote":"127.0.0.1:60247","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"6b38b120-a030-48f4-8266-5b938f546d42","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"cb6e938a-6699-41fd-ba89-dfd28b0d082e","remote":"127.0.0.1:60248","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"cb6e938a-6699-41fd-ba89-dfd28b0d082e","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"b1fb65e2-75a4-4502-bae4-fb420db03752","remote":"127.0.0.1:60249","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"b1fb65e2-75a4-4502-bae4-fb420db03752","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"b37ac4aa-6264-439d-982a-706833e0e263","remote":"127.0.0.1:60250","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"b37ac4aa-6264-439d-982a-706833e0e263","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"9e60bad2-ecb0-47df-b2ca-d43833718eec","remote":"127.0.0.1:60251","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"9e60bad2-ecb0-47df-b2ca-d43833718eec","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"c85acc91-cea6-4e74-abba-65bd1088a186","remote":"127.0.0.1:60252","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"c85acc91-cea6-4e74-abba-65bd1088a186","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"978d7a30-f14c-47b5-945c-850e266906d1","remote":"127.0.0.1:60253","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"978d7a30-f14c-47b5-945c-850e266906d1","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"dba6da0c-77a5-48eb-bfb3-f114b4c09721","remote":"127.0.0.1:60254","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"dba6da0c-77a5-48eb-bfb3-f114b4c09721","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"f69e68b3-fa5b-46c7-9889-61568e73b8b2","remote":"127.0.0.1:60255","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"f69e68b3-fa5b-46c7-9889-61568e73b8b2","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"ea1ba7ea-4335-4d0a-9bd1-9afa551b7283","remote":"127.0.0.1:60256","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"ea1ba7ea-4335-4d0a-9bd1-9afa551b7283","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"65c63e3a-8088-4dc5-af98-5aecfd970bb1","remote":"127.0.0.1:60257","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"65c63e3a-8088-4dc5-af98-5aecfd970bb1","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"596d7565-9d86-45d8-9caf-464cb0cee61f","remote":"127.0.0.1:60258","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"596d7565-9d86-45d8-9caf-464cb0cee61f","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"250d27d4-ee02-4f13-9dbe-9d4adce5bee8","remote":"127.0.0.1:60259","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"250d27d4-ee02-4f13-9dbe-9d4adce5bee8","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"a1069413-e3cb-4545-999f-7b9888a06a17","remote":"127.0.0.1:60260","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"a1069413-e3cb-4545-999f-7b9888a06a17","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"1accffac-e500-4d4f-8de9-6c44d20389c2","remote":"127.0.0.1:60261","event":"client_connected","time":"2026-06-28T11:12:09+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"1accffac-e500-4d4f-8de9-6c44d20389c2","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:09+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"a63109ae-c9de-400a-b98e-9b4a2481eb39","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"a63109ae-c9de-400a-b98e-9b4a2481eb39","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"2b49c4e6-f916-464f-bfff-bb9eb0510dff","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"2b49c4e6-f916-464f-bfff-bb9eb0510dff","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"154c0cc3-d4a0-47c4-9589-145987ebad55","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"154c0cc3-d4a0-47c4-9589-145987ebad55","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"574cd193-67ea-4bef-8cf1-f00ee0953adc","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"574cd193-67ea-4bef-8cf1-f00ee0953adc","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"6776027f-a279-4fe6-824e-de07e3093159","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"6776027f-a279-4fe6-824e-de07e3093159","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"1accffac-e500-4d4f-8de9-6c44d20389c2","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"1accffac-e500-4d4f-8de9-6c44d20389c2","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"a1069413-e3cb-4545-999f-7b9888a06a17","error":"read tcp 127.0.0.1:60241->127.0.0.1:60260: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"error","service":"test","client_id":"250d27d4-ee02-4f13-9dbe-9d4adce5bee8","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"a1069413-e3cb-4545-999f-7b9888a06a17","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"info","service":"test","client_id":"250d27d4-ee02-4f13-9dbe-9d4adce5bee8","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"596d7565-9d86-45d8-9caf-464cb0cee61f","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"596d7565-9d86-45d8-9caf-464cb0cee61f","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"b37ac4aa-6264-439d-982a-706833e0e263","error":"write tcp 127.0.0.1:60241->127.0.0.1:60250: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"65c63e3a-8088-4dc5-af98-5aecfd970bb1","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"65c63e3a-8088-4dc5-af98-5aecfd970bb1","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"978d7a30-f14c-47b5-945c-850e266906d1","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"978d7a30-f14c-47b5-945c-850e266906d1","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"b1fb65e2-75a4-4502-bae4-fb420db03752","error":"read tcp 127.0.0.1:60241->127.0.0.1:60249: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"b1fb65e2-75a4-4502-bae4-fb420db03752","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"9e60bad2-ecb0-47df-b2ca-d43833718eec","error":"write tcp 127.0.0.1:60241->127.0.0.1:60251: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"cb6e938a-6699-41fd-ba89-dfd28b0d082e","error":"read tcp 127.0.0.1:60241->127.0.0.1:60248: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"cb6e938a-6699-41fd-ba89-dfd28b0d082e","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"2b49c4e6-f916-464f-bfff-bb9eb0510dff","error":"write tcp 127.0.0.1:60241->127.0.0.1:60242: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"596d7565-9d86-45d8-9caf-464cb0cee61f","error":"write tcp 127.0.0.1:60241->127.0.0.1:60258: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"b37ac4aa-6264-439d-982a-706833e0e263","error":"read tcp 127.0.0.1:60241->127.0.0.1:60250: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"error","service":"test","client_id":"574cd193-67ea-4bef-8cf1-f00ee0953adc","error":"write tcp 127.0.0.1:60241->127.0.0.1:60243: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"info","service":"test","client_id":"b37ac4aa-6264-439d-982a-706833e0e263","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"6b38b120-a030-48f4-8266-5b938f546d42","error":"write tcp 127.0.0.1:60241->127.0.0.1:60247: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"ea1ba7ea-4335-4d0a-9bd1-9afa551b7283","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"ea1ba7ea-4335-4d0a-9bd1-9afa551b7283","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"dba6da0c-77a5-48eb-bfb3-f114b4c09721","error":"read tcp 127.0.0.1:60241->127.0.0.1:60254: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"dba6da0c-77a5-48eb-bfb3-f114b4c09721","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"f69e68b3-fa5b-46c7-9889-61568e73b8b2","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"f69e68b3-fa5b-46c7-9889-61568e73b8b2","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"c85acc91-cea6-4e74-abba-65bd1088a186","error":"write tcp 127.0.0.1:60241->127.0.0.1:60252: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"65c63e3a-8088-4dc5-af98-5aecfd970bb1","error":"write tcp 127.0.0.1:60241->127.0.0.1:60257: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"250d27d4-ee02-4f13-9dbe-9d4adce5bee8","error":"write tcp 127.0.0.1:60241->127.0.0.1:60259: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"978d7a30-f14c-47b5-945c-850e266906d1","error":"write tcp 127.0.0.1:60241->127.0.0.1:60253: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"a1069413-e3cb-4545-999f-7b9888a06a17","error":"write tcp 127.0.0.1:60241->127.0.0.1:60260: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"cb6e938a-6699-41fd-ba89-dfd28b0d082e","error":"write tcp 127.0.0.1:60241->127.0.0.1:60248: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"b1fb65e2-75a4-4502-bae4-fb420db03752","error":"write tcp 127.0.0.1:60241->127.0.0.1:60249: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"dba6da0c-77a5-48eb-bfb3-f114b4c09721","error":"write tcp 127.0.0.1:60241->127.0.0.1:60254: wsasend: An existing connection was forcibly closed by the remote host.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"ea1ba7ea-4335-4d0a-9bd1-9afa551b7283","error":"write tcp 127.0.0.1:60241->127.0.0.1:60256: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"a63109ae-c9de-400a-b98e-9b4a2481eb39","error":"write tcp 127.0.0.1:60241->127.0.0.1:60244: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+--- PASS: TestGateway_ConcurrentPublishAndSubscribe (0.29s)
+{"level":"error","service":"test","client_id":"9e60bad2-ecb0-47df-b2ca-d43833718eec","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+=== RUN   TestHeartbeatManager_RegisterUnregister
+{"level":"info","service":"test","client_id":"9e60bad2-ecb0-47df-b2ca-d43833718eec","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"6b38b120-a030-48f4-8266-5b938f546d42","error":"read tcp 127.0.0.1:60241->127.0.0.1:60247: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"6b38b120-a030-48f4-8266-5b938f546d42","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"f69e68b3-fa5b-46c7-9889-61568e73b8b2","error":"write tcp 127.0.0.1:60241->127.0.0.1:60255: wsasend: An established connection was aborted by the software in your host machine.","event":"write_error","time":"2026-06-28T11:12:09+05:30","message":"write error"}
+{"level":"error","service":"test","client_id":"c85acc91-cea6-4e74-abba-65bd1088a186","error":"read tcp 127.0.0.1:60241->127.0.0.1:60252: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:09+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"c85acc91-cea6-4e74-abba-65bd1088a186","event":"client_disconnected","time":"2026-06-28T11:12:09+05:30","message":"client disconnected"}
+--- PASS: TestHeartbeatManager_RegisterUnregister (0.03s)
+=== RUN   TestHeartbeatManager_RecordPingPong
+--- PASS: TestHeartbeatManager_RecordPingPong (0.08s)
+=== RUN   TestHeartbeatManager_TimeoutDetection
+{"level":"warn","service":"test","client_id":"client-1","timeout":50,"event":"heartbeat_timeout","time":"2026-06-28T11:12:10+05:30","message":"heartbeat: client timed out"}
+--- PASS: TestHeartbeatManager_TimeoutDetection (0.11s)
+=== RUN   TestHeartbeatManager_NoPingNoTimeout
+--- PASS: TestHeartbeatManager_NoPingNoTimeout (0.13s)
+=== RUN   TestHeartbeatManager_MultiplePingsBeforePong
+--- PASS: TestHeartbeatManager_MultiplePingsBeforePong (0.02s)
+=== RUN   TestGateway_HeartbeatCleanupIntegration
+{"level":"info","service":"test","client_id":"d9826e3d-0aed-450d-849d-0e6ca2681ba2","remote":"127.0.0.1:60263","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"d9826e3d-0aed-450d-849d-0e6ca2681ba2","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"d9826e3d-0aed-450d-849d-0e6ca2681ba2","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"d9826e3d-0aed-450d-849d-0e6ca2681ba2","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+--- PASS: TestGateway_HeartbeatCleanupIntegration (0.05s)
+=== RUN   TestGateway_HeartbeatMultipleClientsCleanup
+{"level":"info","service":"test","client_id":"5aed355a-69a4-48e4-9f99-191458e013db","remote":"127.0.0.1:60265","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"5aed355a-69a4-48e4-9f99-191458e013db","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"33eec641-16dc-4eeb-bc05-67a3c01c226c","remote":"127.0.0.1:60266","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"33eec641-16dc-4eeb-bc05-67a3c01c226c","symbols":["MSFT"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"info","service":"test","client_id":"45170a3e-40e8-4336-b2b3-0be90ba23635","remote":"127.0.0.1:60267","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"45170a3e-40e8-4336-b2b3-0be90ba23635","symbols":["GOOG"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"5aed355a-69a4-48e4-9f99-191458e013db","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"5aed355a-69a4-48e4-9f99-191458e013db","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"33eec641-16dc-4eeb-bc05-67a3c01c226c","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"33eec641-16dc-4eeb-bc05-67a3c01c226c","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+{"level":"error","service":"test","client_id":"45170a3e-40e8-4336-b2b3-0be90ba23635","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"45170a3e-40e8-4336-b2b3-0be90ba23635","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+--- PASS: TestGateway_HeartbeatMultipleClientsCleanup (0.09s)
+=== RUN   TestGateway_HeartbeatMetricsIncremented
+{"level":"info","service":"test","client_id":"2de58004-31c7-43aa-9564-5e93119f27da","remote":"127.0.0.1:60269","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+{"level":"info","service":"test","client_id":"2de58004-31c7-43aa-9564-5e93119f27da","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"2de58004-31c7-43aa-9564-5e93119f27da","error":"read tcp 127.0.0.1:60268->127.0.0.1:60269: wsarecv: An existing connection was forcibly closed by the remote host.","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"2de58004-31c7-43aa-9564-5e93119f27da","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+--- PASS: TestGateway_HeartbeatMetricsIncremented (0.39s)
+=== RUN   TestBackoff_Delay
+--- PASS: TestBackoff_Delay (0.00s)
+=== RUN   TestBackoff_DelayWithJitter
+--- PASS: TestBackoff_DelayWithJitter (0.00s)
+=== RUN   TestDefaultBackoff
+--- PASS: TestDefaultBackoff (0.00s)
+=== RUN   TestReconnectClient_Subscribe
+--- PASS: TestReconnectClient_Subscribe (0.00s)
+=== RUN   TestReconnectClient_Unsubscribe
+--- PASS: TestReconnectClient_Unsubscribe (0.00s)
+=== RUN   TestReconnectClient_BasicConnect
+{"level":"info","service":"test","client_id":"43f9ae63-119f-46f5-bf25-e58c8e2ceb60","remote":"127.0.0.1:60271","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60270/ws","time":"2026-06-28T11:12:10+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL"],"time":"2026-06-28T11:12:10+05:30","message":"reconnect: resubscribed"}
+    writer.go:27: {"level":"error","error":"read tcp 127.0.0.1:60271->127.0.0.1:60270: use of closed network connection","time":"2026-06-28T11:12:10+05:30","message":"reconnect: read error"}
+{"level":"info","service":"test","client_id":"43f9ae63-119f-46f5-bf25-e58c8e2ceb60","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"43f9ae63-119f-46f5-bf25-e58c8e2ceb60","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:10+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"43f9ae63-119f-46f5-bf25-e58c8e2ceb60","event":"client_disconnected","time":"2026-06-28T11:12:10+05:30","message":"client disconnected"}
+--- PASS: TestReconnectClient_BasicConnect (0.06s)
+=== RUN   TestReconnectClient_ReconnectAfterServerRestart
+{"level":"info","service":"test","client_id":"6eccff99-b6fc-4d2a-a4ca-48d5bfc8b9dc","remote":"127.0.0.1:60273","event":"client_connected","time":"2026-06-28T11:12:10+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60272/ws","time":"2026-06-28T11:12:10+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL"],"time":"2026-06-28T11:12:10+05:30","message":"reconnect: resubscribed"}
+{"level":"info","service":"test","client_id":"6eccff99-b6fc-4d2a-a4ca-48d5bfc8b9dc","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:10+05:30","message":"subscribed"}
+{"level":"info","service":"test","delay":167,"event":"gateway_draining","time":"2026-06-28T11:12:10+05:30","message":"gateway: starting graceful drain"}
+{"level":"error","service":"test","client_id":"6eccff99-b6fc-4d2a-a4ca-48d5bfc8b9dc","error":"read tcp 127.0.0.1:60272->127.0.0.1:60273: use of closed network connection","event":"read_error","time":"2026-06-28T11:12:11+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"6eccff99-b6fc-4d2a-a4ca-48d5bfc8b9dc","event":"client_disconnected","time":"2026-06-28T11:12:11+05:30","message":"client disconnected"}
+    writer.go:27: {"level":"debug","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connection closed normally"}
+    writer.go:27: {"level":"info","delay":50,"attempt":0,"time":"2026-06-28T11:12:11+05:30","message":"reconnect: waiting before next attempt"}
+{"level":"info","service":"test","client_id":"2c459734-9dcd-4c98-9f25-e3a2136d6f7d","remote":"127.0.0.1:60275","event":"client_connected","time":"2026-06-28T11:12:11+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60274/ws","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL"],"time":"2026-06-28T11:12:11+05:30","message":"reconnect: resubscribed"}
+{"level":"info","service":"test","client_id":"2c459734-9dcd-4c98-9f25-e3a2136d6f7d","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:11+05:30","message":"subscribed"}
+    writer.go:27: {"level":"error","error":"read tcp 127.0.0.1:60275->127.0.0.1:60274: use of closed network connection","time":"2026-06-28T11:12:11+05:30","message":"reconnect: read error"}
+{"level":"error","service":"test","client_id":"2c459734-9dcd-4c98-9f25-e3a2136d6f7d","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:11+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"2c459734-9dcd-4c98-9f25-e3a2136d6f7d","event":"client_disconnected","time":"2026-06-28T11:12:11+05:30","message":"client disconnected"}
+--- PASS: TestReconnectClient_ReconnectAfterServerRestart (0.61s)
+=== RUN   TestReconnectClient_MultipleSubscriptionsResubscribe
+{"level":"info","service":"test","client_id":"525877b0-4d92-46b7-af3f-1138eb35b240","remote":"127.0.0.1:60277","event":"client_connected","time":"2026-06-28T11:12:11+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60276/ws","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["GOOG","AAPL","MSFT"],"time":"2026-06-28T11:12:11+05:30","message":"reconnect: resubscribed"}
+{"level":"info","service":"test","delay":120,"event":"gateway_draining","time":"2026-06-28T11:12:11+05:30","message":"gateway: starting graceful drain"}
+{"level":"info","service":"test","client_id":"525877b0-4d92-46b7-af3f-1138eb35b240","symbols":["GOOG","AAPL","MSFT"],"event":"client_subscribed","time":"2026-06-28T11:12:11+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"525877b0-4d92-46b7-af3f-1138eb35b240","error":"read tcp 127.0.0.1:60276->127.0.0.1:60277: i/o timeout","event":"read_error","time":"2026-06-28T11:12:11+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"525877b0-4d92-46b7-af3f-1138eb35b240","event":"client_disconnected","time":"2026-06-28T11:12:11+05:30","message":"client disconnected"}
+    writer.go:27: {"level":"debug","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connection closed normally"}
+    writer.go:27: {"level":"info","delay":50,"attempt":0,"time":"2026-06-28T11:12:11+05:30","message":"reconnect: waiting before next attempt"}
+{"level":"info","service":"test","client_id":"ffae465b-193d-465a-b4ae-c1ac6b71f894","remote":"127.0.0.1:60279","event":"client_connected","time":"2026-06-28T11:12:11+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60278/ws","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL","MSFT","GOOG"],"time":"2026-06-28T11:12:11+05:30","message":"reconnect: resubscribed"}
+{"level":"info","service":"test","client_id":"ffae465b-193d-465a-b4ae-c1ac6b71f894","symbols":["AAPL","MSFT","GOOG"],"event":"client_subscribed","time":"2026-06-28T11:12:11+05:30","message":"subscribed"}
+    writer.go:27: {"level":"error","error":"read tcp 127.0.0.1:60279->127.0.0.1:60278: use of closed network connection","time":"2026-06-28T11:12:11+05:30","message":"reconnect: read error"}
+--- PASS: TestReconnectClient_MultipleSubscriptionsResubscribe (0.21s)
+=== RUN   TestReconnectClient_ExponentialBackoff
+{"level":"error","service":"test","client_id":"ffae465b-193d-465a-b4ae-c1ac6b71f894","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:11+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"ffae465b-193d-465a-b4ae-c1ac6b71f894","event":"client_disconnected","time":"2026-06-28T11:12:11+05:30","message":"client disconnected"}
+--- PASS: TestReconnectClient_ExponentialBackoff (0.20s)
+=== RUN   TestReconnectClient_ConnectedState
+{"level":"info","service":"test","client_id":"b5542424-bb1d-485d-b9e4-9a6b06cc964f","remote":"127.0.0.1:60289","event":"client_connected","time":"2026-06-28T11:12:11+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60288/ws","time":"2026-06-28T11:12:11+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL"],"time":"2026-06-28T11:12:11+05:30","message":"reconnect: resubscribed"}
+    writer.go:27: {"level":"error","error":"read tcp 127.0.0.1:60289->127.0.0.1:60288: use of closed network connection","time":"2026-06-28T11:12:11+05:30","message":"reconnect: read error"}
+{"level":"info","service":"test","client_id":"b5542424-bb1d-485d-b9e4-9a6b06cc964f","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:11+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"b5542424-bb1d-485d-b9e4-9a6b06cc964f","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:11+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"b5542424-bb1d-485d-b9e4-9a6b06cc964f","event":"client_disconnected","time":"2026-06-28T11:12:11+05:30","message":"client disconnected"}
+--- PASS: TestReconnectClient_ConnectedState (0.11s)
+=== RUN   TestReconnectClient_StopDuringReconnect
+--- PASS: TestReconnectClient_StopDuringReconnect (0.04s)
+=== RUN   TestReconnectClient_EventsChannelClosed
+{"level":"info","service":"test","client_id":"2b6c58f2-259b-480d-98a8-11ac94c57755","remote":"127.0.0.1:60295","event":"client_connected","time":"2026-06-28T11:12:12+05:30","message":"client connected"}
+    writer.go:27: {"level":"info","url":"ws://127.0.0.1:60294/ws","time":"2026-06-28T11:12:12+05:30","message":"reconnect: connected"}
+    writer.go:27: {"level":"info","symbols":["AAPL"],"time":"2026-06-28T11:12:12+05:30","message":"reconnect: resubscribed"}
+    writer.go:27: {"level":"error","error":"read tcp 127.0.0.1:60295->127.0.0.1:60294: use of closed network connection","time":"2026-06-28T11:12:12+05:30","message":"reconnect: read error"}
+{"level":"info","service":"test","client_id":"2b6c58f2-259b-480d-98a8-11ac94c57755","symbols":["AAPL"],"event":"client_subscribed","time":"2026-06-28T11:12:12+05:30","message":"subscribed"}
+{"level":"error","service":"test","client_id":"2b6c58f2-259b-480d-98a8-11ac94c57755","error":"websocket: close 1006 (abnormal closure): unexpected EOF","event":"read_error","time":"2026-06-28T11:12:12+05:30","message":"read error"}
+{"level":"info","service":"test","client_id":"2b6c58f2-259b-480d-98a8-11ac94c57755","event":"client_disconnected","time":"2026-06-28T11:12:12+05:30","message":"client disconnected"}
+--- PASS: TestReconnectClient_EventsChannelClosed (0.02s)
+PASS
+ok  	github.com/sumit/rtmds/internal/websocket	4.753s
+=== RUN   TestRecorderBatching
+--- PASS: TestRecorderBatching (0.51s)
+=== RUN   TestRecordingValidation
+    recorder_test.go:108: Expected 100000 events stored, got 98440
+--- FAIL: TestRecordingValidation (27.05s)
+FAIL
+FAIL	github.com/sumit/rtmds/internal/recorder/engine	41.124s
+=== RUN   TestClockSpeed
+--- PASS: TestClockSpeed (0.12s)
+PASS
+ok  	github.com/sumit/rtmds/internal/replay/scheduler	5.809s
+=== RUN   TestReplayAccuracy
+--- PASS: TestReplayAccuracy (0.00s)
+=== RUN   TestConcurrentReplay
+--- PASS: TestConcurrentReplay (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/replay/engine	11.776s
+testing: warning: no tests to run
+PASS
+ok  	github.com/sumit/rtmds/internal/bench	2.310s [no tests to run]
+=== RUN   TestUUIDv7Generator
+--- PASS: TestUUIDv7Generator (0.00s)
+=== RUN   TestContextHelpers
+--- PASS: TestContextHelpers (0.00s)
+=== RUN   TestHTTPMiddleware
+=== RUN   TestHTTPMiddleware/Without_Existing_Baggage
+=== RUN   TestHTTPMiddleware/With_Existing_Baggage
+--- PASS: TestHTTPMiddleware (0.00s)
+    --- PASS: TestHTTPMiddleware/Without_Existing_Baggage (0.00s)
+    --- PASS: TestHTTPMiddleware/With_Existing_Baggage (0.00s)
+=== RUN   TestSpanProcessorIntegration
+--- PASS: TestSpanProcessorIntegration (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/correlation	6.310s
+?   	github.com/sumit/rtmds/internal/correlation/context	[no test files]
+?   	github.com/sumit/rtmds/internal/correlation/generator	[no test files]
+?   	github.com/sumit/rtmds/internal/correlation/middleware	[no test files]
+=== RUN   TestRedisPropagation
+--- PASS: TestRedisPropagation (0.00s)
+=== RUN   TestWorkerPropagation
+--- PASS: TestWorkerPropagation (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/correlation/propagation	7.418s
+?   	github.com/sumit/rtmds/internal/correlation/tracing	[no test files]
+=== RUN   TestNewConnectionContext_SeverCancellation
+--- PASS: TestNewConnectionContext_SeverCancellation (0.00s)
+=== RUN   TestNewConnectionContext_PreservesCorrelationID
+--- PASS: TestNewConnectionContext_PreservesCorrelationID (0.00s)
+=== RUN   TestDeriveMessageContext
+--- PASS: TestDeriveMessageContext (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/correlation/websocket	6.039s
+=== RUN   TestTracePropagation_RedisRoundTrip
+--- PASS: TestTracePropagation_RedisRoundTrip (0.00s)
+=== RUN   TestTracePropagation_CarrierSerialization
+--- PASS: TestTracePropagation_CarrierSerialization (0.00s)
+=== RUN   TestTracePropagation_ComponentScopes
+=== RUN   TestTracePropagation_ComponentScopes/redis/redis.publish
+    verify_test.go:187: span "redis.publish" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/redis/redis.consume
+    verify_test.go:187: span "redis.consume" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/feed/pipeline.start
+    verify_test.go:187: span "pipeline.start" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/websocket/websocket.connect
+    verify_test.go:187: span "websocket.connect" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/websocket/subscription_request
+    verify_test.go:187: span "subscription_request" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/snapshot/snapshot.request
+    verify_test.go:187: span "snapshot.request" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/snapshot/snapshot.lookup
+    verify_test.go:187: span "snapshot.lookup" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/replay/replay.request
+    verify_test.go:187: span "replay.request" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/eventlog/db.query_events
+    verify_test.go:187: span "db.query_events" created with valid context
+=== RUN   TestTracePropagation_ComponentScopes/eventlog/db.append
+    verify_test.go:187: span "db.append" created with valid context
+--- PASS: TestTracePropagation_ComponentScopes (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/redis/redis.publish (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/redis/redis.consume (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/feed/pipeline.start (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/websocket/websocket.connect (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/websocket/subscription_request (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/snapshot/snapshot.request (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/snapshot/snapshot.lookup (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/replay/replay.request (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/eventlog/db.query_events (0.00s)
+    --- PASS: TestTracePropagation_ComponentScopes/eventlog/db.append (0.00s)
+=== RUN   TestTracePropagation_ParentChildChain
+--- PASS: TestTracePropagation_ParentChildChain (0.00s)
+=== RUN   TestSpanAttributes_LowCardinality
+    verify_test.go:314: All allowed attributes set successfully
+--- PASS: TestSpanAttributes_LowCardinality (0.00s)
+=== RUN   TestInjectTraceContext_EmptyContext
+--- PASS: TestInjectTraceContext_EmptyContext (0.00s)
+=== RUN   TestTracePropagation_ConcurrentSafety
+--- PASS: TestTracePropagation_ConcurrentSafety (0.00s)
+=== RUN   TestTracingLifecycle
+--- PASS: TestTracingLifecycle (0.00s)
+=== RUN   TestFactoryRecordError
+--- PASS: TestFactoryRecordError (0.00s)
+=== RUN   TestContextBranching
+--- PASS: TestContextBranching (0.01s)
+PASS
+ok  	github.com/sumit/rtmds/internal/tracing	1.418s
+?   	github.com/sumit/rtmds/internal/tracing/attributes	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/config	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/context	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/factory	[no test files]
+=== RUN   TestInstrumentationPhase1
+=== RUN   TestInstrumentationPhase1/Postgres
+=== RUN   TestInstrumentationPhase1/Snapshot
+=== RUN   TestInstrumentationPhase1/Replay
+=== RUN   TestInstrumentationPhase1/Recovery
+=== RUN   TestInstrumentationPhase1/Publisher
+--- PASS: TestInstrumentationPhase1 (0.00s)
+    --- PASS: TestInstrumentationPhase1/Postgres (0.00s)
+    --- PASS: TestInstrumentationPhase1/Snapshot (0.00s)
+    --- PASS: TestInstrumentationPhase1/Replay (0.00s)
+    --- PASS: TestInstrumentationPhase1/Recovery (0.00s)
+    --- PASS: TestInstrumentationPhase1/Publisher (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/tracing/instrumentation	3.504s
+?   	github.com/sumit/rtmds/internal/tracing/instrumentation/postgres	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/instrumentation/publisher	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/instrumentation/recovery	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/instrumentation/replay	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/instrumentation/snapshot	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/middleware	[no test files]
+=== RUN   TestRedisPropagation
+--- PASS: TestRedisPropagation (0.00s)
+=== RUN   TestWebSocketPropagation
+--- PASS: TestWebSocketPropagation (0.00s)
+=== RUN   TestWorkerPropagation
+--- PASS: TestWorkerPropagation (0.01s)
+=== RUN   TestWorkerPropagationPanic
+--- PASS: TestWorkerPropagationPanic (0.00s)
+PASS
+ok  	github.com/sumit/rtmds/internal/tracing/propagation	2.959s
+?   	github.com/sumit/rtmds/internal/tracing/provider	[no test files]
+?   	github.com/sumit/rtmds/internal/tracing/samplers	[no test files]
+FAIL
+=== RUN   TestChaos_KillGateway1
+    chaos_test.go:166: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_KillGateway1 (0.38s)
+=== RUN   TestChaos_KillGateway2
+    chaos_test.go:206: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_KillGateway2 (0.36s)
+=== RUN   TestChaos_RestartRedis
+    chaos_test.go:240: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_RestartRedis (0.37s)
+=== RUN   TestChaos_RestartAllGateways
+    chaos_test.go:280: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_RestartAllGateways (0.36s)
+=== RUN   TestChaos_KillGatewayAndRedis
+    chaos_test.go:329: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_KillGatewayAndRedis (0.34s)
+=== RUN   TestChaos_DataFlowVerification
+    chaos_test.go:367: skipping: docker compose not available: exit status 1
+--- SKIP: TestChaos_DataFlowVerification (0.33s)
+=== RUN   TestRedisSubscriberWithRouter
+redis: 2026/06/28 11:13:00 pool.go:724: redis: connection pool: failed to dial after 5 attempts: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/06/28 11:13:00 pool.go:724: redis: connection pool: failed to dial after 5 attempts: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/06/28 11:13:01 pool.go:724: redis: connection pool: failed to dial after 5 attempts: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.
+redis: 2026/06/28 11:13:01 pool.go:724: redis: connection pool: failed to dial after 5 attempts: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.
+    distributed_test.go:57: skipping: Redis not available at localhost:6379: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.
+--- SKIP: TestRedisSubscriberWithRouter (1.91s)
+=== RUN   TestCrossGatewayDelivery
+redis: 2026/06/28 11:13:02 pool.go:724: redis: connection pool: failed to dial after 5 attempts: dial tcp [::1]:6379: connectex: No connection could be made because the target machine actively refused it.

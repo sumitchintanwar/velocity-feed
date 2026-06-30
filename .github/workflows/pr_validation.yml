@@ -1,0 +1,74 @@
+name: PR Validation
+
+on:
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  validate:
+    name: Validate Pull Request
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          # Read Go version directly from go.mod to ensure single source of truth.
+          # When go.mod is updated, both PR and Nightly workflows automatically pick up the new version.
+          go-version-file: go.mod
+          cache: true
+
+      - name: Verify Dependencies
+        run: |
+          go mod verify
+          go mod tidy
+          git diff --exit-code || (echo "go.mod/go.sum is not tidy. Run 'go mod tidy' and commit." && exit 1)
+
+      - name: Verify Formatting (gofmt)
+        # Explicit gofmt check is independent of linter configuration.
+        # Ensures formatting is always enforced even if lint rules change.
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "The following files are not gofmt-formatted:"
+            echo "$unformatted"
+            exit 1
+          fi
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          # Pinned to a specific version for reproducible builds.
+          # Upgrade deliberately to control when linter rule changes affect CI.
+          version: v1.64.8
+          args: --timeout=5m
+
+      - name: Verify Build
+        run: go build -v ./...
+
+      - name: Unit Tests & Race Detection
+        # We run tests with -race and -short to ensure fast feedback on PRs.
+        run: go test -v -race -short ./...
+
+      - name: Validate Docker Compose
+        # Ensures that the docker-compose.yml is structurally valid and can parse env vars
+        run: docker compose -f deployments/docker-compose/docker-compose.yml config > /dev/null
+
+      - name: Install kubeconform
+        # kubeconform validates manifests against strict Kubernetes API schemas,
+        # catching type errors and deprecated fields that kubectl --dry-run=client misses.
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+
+      - name: Validate Kubernetes Manifests
+        # Recursively validates all YAML files under deployments/k8s/ against the
+        # Kubernetes 1.30 API schema, including nested environment subdirectories.
+        run: |
+          find deployments/k8s -name "*.yaml" | xargs kubeconform \
+            -kubernetes-version 1.30.0 \
+            -summary \
+            -strict

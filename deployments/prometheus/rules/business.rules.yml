@@ -1,0 +1,31 @@
+groups:
+- name: business
+  rules:
+  - alert: MassClientDisconnects
+    expr: sum(rate(gateway_client_disconnects_total[5m])) > 1000
+    for: 2m
+    labels:
+      severity: critical
+      team: business
+      category: client_activity
+    annotations:
+      summary: Mass Client Disconnects Detected
+      description: '>1000 clients have disconnected in 5 minutes.'
+      runbook_url: https://wiki.internal/runbooks/business/mass-disconnects
+      dashboard_url: /d/market-data-operations
+      related_traces: service=rtmds-gateway
+      related_metrics: sum(rate(gateway_client_disconnects_total[5m])) > 1000
+  - alert: SlowConsumersDetected
+    expr: sum(gateway_slow_consumers_total) > 50
+    for: 5m
+    labels:
+      severity: high
+      team: business
+      category: client_activity
+    annotations:
+      summary: Slow Consumers Detected
+      description: Clients are failing to read from the TCP socket, causing backpressure.
+      runbook_url: https://wiki.internal/runbooks/business/slow-consumers
+      dashboard_url: /d/market-data-operations
+      related_traces: service=rtmds-gateway
+      related_metrics: sum(gateway_slow_consumers_total) > 50

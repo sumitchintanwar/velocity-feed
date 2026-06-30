@@ -1,0 +1,107 @@
+# ==============================================================================
+# Purpose: Deploys the Publisher service which routes live market data to Redis.
+# Architecture: Highly scalable stateless Deployment.
+# Design Decisions:
+# - Scaling priority is high. 3 replicas minimum.
+# - CPU intensive due to JSON/binary serialization and filtering. Memory is moderate.
+# - Fully isolated deployment to allow horizontal scaling independently from the Gateway.
+# - Rolling updates with maxSurge 25% guarantees uninterrupted tick distribution.
+# ==============================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rtmds-publisher
+  namespace: rtmds
+  labels:
+    app.kubernetes.io/name: publisher
+    app.kubernetes.io/part-of: rtmds
+spec:
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: publisher
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: publisher
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 1000
+      terminationGracePeriodSeconds: 45
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/name
+                  operator: In
+                  values:
+                  - publisher
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: publisher
+        image: rtmds/publisher:latest
+        imagePullPolicy: Always
+        command: ["/bin/rtmds", "publisher"]
+        securityContext:
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+        ports:
+        - containerPort: 8081
+          name: http
+        envFrom:
+        - configMapRef:
+            name: rtmds-config
+        - secretRef:
+            name: rtmds-redis-credentials
+        - secretRef:
+            name: rtmds-postgres-credentials
+        resources:
+          requests:
+            cpu: "1000m"
+            memory: "512Mi"
+          limits:
+            cpu: "4000m"
+            memory: "1Gi"
+        startupProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          failureThreshold: 30
+          periodSeconds: 2
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8081
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /live
+            port: 8081
+          periodSeconds: 10
+          failureThreshold: 3
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rtmds-publisher
+  namespace: rtmds
+  labels:
+    app.kubernetes.io/name: publisher
+spec:
+  selector:
+    app.kubernetes.io/name: publisher
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8081
+  type: ClusterIP

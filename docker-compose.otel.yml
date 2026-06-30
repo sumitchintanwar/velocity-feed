@@ -1,0 +1,133 @@
+# OpenTelemetry Tracing Stack
+#
+# Adds Jaeger all-in-one to the base stack for trace visualization.
+# Jaeger accepts OTLP/HTTP on port 4318 (matches RTMDS_TRACING_ENDPOINT).
+#
+# Quick start:
+#   make trace-up
+#
+# Verify:
+#   curl http://localhost:16686/api/services
+#   open http://localhost:16686  (Jaeger UI)
+#
+# Tear down:
+#   make trace-down
+
+services:
+  # ── Jaeger (trace backend + UI) ───────────────────────────────────────────
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: rtmds-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "4318:4318"     # OTLP HTTP receiver (matches RTMDS_TRACING_ENDPOINT)
+      - "14268:14268"   # Jaeger Thrift HTTP (legacy)
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:16686/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - rtmds-net
+
+  # ── Real-Time Market Data Server (with tracing enabled) ───────────────────
+  server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: rtmds:local
+    container_name: rtmds-server-otel
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      RTMDS_SERVER_HOST: "0.0.0.0"
+      RTMDS_SERVER_PORT: "8080"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_SYMBOLS: "AAPL,TSLA,MSFT,GOOGL,AMZN"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+      RTMDS_METRICS_ENABLED: "true"
+      RTMDS_DATABASE_ENABLED: "true"
+      RTMDS_DATABASE_HOST: "postgres"
+      RTMDS_DATABASE_PORT: "5432"
+      RTMDS_DATABASE_USER: "postgres"
+      RTMDS_DATABASE_PASSWORD: "postgres"
+      RTMDS_DATABASE_DBNAME: "rtmds"
+      RTMDS_DATABASE_SSLMODE: "disable"
+      # Tracing — 100% sampling for verification (DO NOT use in production)
+      RTMDS_TRACING_ENABLED: "true"
+      RTMDS_TRACING_ENDPOINT: "jaeger:4318"
+      RTMDS_TRACING_SAMPLE_RATIO: "1.0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8080/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - rtmds-net
+
+  # ── Redis ─────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7.4-alpine
+    container_name: rtmds-redis-otel
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rtmds-net
+
+  # ── PostgreSQL ────────────────────────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    container_name: rtmds-postgres-otel
+    restart: unless-stopped
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rtmds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rtmds"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - rtmds-net
+
+  # ── Prometheus ────────────────────────────────────────────────────────────
+  prometheus:
+    image: prom/prometheus:v2.53.0
+    container_name: rtmds-prometheus-otel
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./deployments/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    depends_on:
+      - server
+    networks:
+      - rtmds-net
+
+networks:
+  rtmds-net:
+    driver: bridge

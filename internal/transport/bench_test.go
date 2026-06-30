@@ -2,12 +2,13 @@ package transport
 
 import (
 	"context"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/config"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/websocket"
@@ -23,11 +24,12 @@ func newBenchRouter(b *testing.B) http.Handler {
 	b.Helper()
 	metrics, gatherer := platform.NewMetrics("bench_http")
 	tm := topicmanager.New(0)
-	gw := websocket.NewGateway(tm, zerolog.Nop(), metrics, 100.0)
+	logger := log.New(io.Discard, "bench")
+	gw := websocket.NewGateway(tm, logger, metrics, 100.0)
 	cfg := &config.Config{
 		Metrics: config.MetricsConfig{Enabled: true, Path: "/metrics"},
 	}
-	return NewRouter(cfg, gw, zerolog.Nop(), metrics, gatherer, &benchHealthReporter{}, nil)
+	return NewRouter(cfg, gw, logger, metrics, gatherer, &benchHealthReporter{}, nil, nil, nil, nil, nil)
 }
 
 // ---------- Health Endpoint ----------

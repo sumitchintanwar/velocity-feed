@@ -6,7 +6,7 @@
 // Usage:
 //
 //	c, err := client.New("ws://localhost:8080/ws")
-//	if err != nil { log.Fatal(err) }
+//	if err != nil { panic(err) }
 //	defer c.Close()
 //
 //	c.Subscribe("AAPL", "TSLA")
@@ -18,12 +18,18 @@ package client
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"math/rand"
 	"sync"
 	"time"
 
 	"nhooyr.io/websocket"
 )
+
+// ErrDisconnected is returned when an operation requires an active connection
+// but the client is currently disconnected.
+var ErrDisconnected = errors.New("client: disconnected")
 
 // Message is the envelope received from the server.
 type Message struct {
@@ -41,6 +47,8 @@ type Options struct {
 	InitialBackoff time.Duration
 	// MaxBackoff is the maximum delay between reconnect attempts.
 	MaxBackoff time.Duration
+	// DialTimeout is the timeout for WebSocket dial operations.
+	DialTimeout time.Duration
 }
 
 // DefaultOptions returns sensible defaults for the client.
@@ -48,9 +56,18 @@ func DefaultOptions() Options {
 	return Options{
 		Reconnect:            true,
 		MaxReconnectAttempts: 0,
-		InitialBackoff:       500 * time.Millisecond,
+		InitialBackoff:       1 * time.Second,
 		MaxBackoff:           30 * time.Second,
+		DialTimeout:          5 * time.Second,
 	}
+}
+
+// dialTimeout is the default timeout for WebSocket dial operations.
+const dialTimeout = 5 * time.Second
+
+// newRng creates a new seeded random number generator for jitter calculations.
+func newRng() *rand.Rand {
+	return rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 }
 
 // Client is a WebSocket client for the RTMDS server. It implements the
@@ -68,6 +85,9 @@ type Client struct {
 	subscriptions []string // client-side subscription state (source of truth)
 	reconnecting  bool
 	cancelReconnect context.CancelFunc
+
+	closing      bool
+	shutdownOnce sync.Once
 }
 
 // New dials the RTMDS WebSocket endpoint and returns a ready Client.
@@ -77,7 +97,9 @@ func New(url string, opts ...Options) (*Client, error) {
 		o = opts[0]
 	}
 
-	conn, _, err := websocket.Dial(context.Background(), url, nil)
+	dialCtx, dialCancel := context.WithTimeout(context.Background(), dialTimeout)
+	defer dialCancel()
+	conn, _, err := websocket.Dial(dialCtx, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("client: dial %q: %w", url, err)
 	}
@@ -96,6 +118,9 @@ func New(url string, opts ...Options) (*Client, error) {
 // Subscribe sends a subscribe command to the server and records the
 // subscription client-side. On reconnect, all recorded subscriptions
 // are automatically re-sent to the new gateway.
+//
+// Returns ErrDisconnected if the client is currently disconnected.
+// The subscription is still tracked locally and will be re-sent on reconnect.
 func (c *Client) Subscribe(symbols ...string) error {
 	c.mu.Lock()
 	// Merge new symbols into tracked subscriptions (deduplicate).
@@ -108,8 +133,12 @@ func (c *Client) Subscribe(symbols ...string) error {
 			c.subscriptions = append(c.subscriptions, s)
 		}
 	}
+	conn := c.conn
 	c.mu.Unlock()
 
+	if conn == nil {
+		return ErrDisconnected
+	}
 	return c.writeSubscribe(symbols)
 }
 
@@ -128,8 +157,12 @@ func (c *Client) Unsubscribe(symbols ...string) error {
 		}
 	}
 	c.subscriptions = filtered
+	conn := c.conn
 	c.mu.Unlock()
 
+	if conn == nil {
+		return ErrDisconnected
+	}
 	return c.writeUnsubscribe(symbols)
 }
 
@@ -159,6 +192,8 @@ func (c *Client) Close() error {
 	// Disable reconnect before closing.
 	c.mu.Lock()
 	c.reconnecting = false
+	c.opts.Reconnect = false
+	c.closing = true
 	if c.cancelReconnect != nil {
 		c.cancelReconnect()
 	}
@@ -210,21 +245,42 @@ func (c *Client) writeUnsubscribe(symbols []string) error {
 	}))
 }
 
+// shutdown safely closes the client's channels exactly once.
+func (c *Client) shutdown() {
+	c.shutdownOnce.Do(func() {
+		close(c.msgCh)
+		close(c.doneCh)
+	})
+}
+
 // readLoop reads messages from the WebSocket and dispatches them.
 // On connection loss, it attempts to reconnect if enabled.
 func (c *Client) readLoop() {
-	defer func() {
-		close(c.msgCh)
-		close(c.doneCh)
-	}()
-
 	for {
-		_, data, err := c.conn.Read(context.Background())
+		c.mu.Lock()
+		conn := c.conn
+		closing := c.closing
+		c.mu.Unlock()
+
+		if closing {
+			c.shutdown()
+			return
+		}
+
+		_, data, err := conn.Read(context.Background())
 		if err != nil {
-			if c.opts.Reconnect {
+			// Explicitly close the old connection to prevent resource leaks
+			// (file descriptors, TCP sockets in CLOSE_WAIT state).
+			_ = conn.Close(websocket.StatusNormalClosure, "")
+
+			c.mu.Lock()
+			closing = c.closing
+			c.mu.Unlock()
+			if c.opts.Reconnect && !closing {
 				c.reconnect()
 				return // readLoop exits; reconnectLoop starts a new one
 			}
+			c.shutdown()
 			return
 		}
 		var msg Message
@@ -244,6 +300,8 @@ func (c *Client) reconnect() {
 		return
 	}
 	c.reconnecting = true
+	// Clear the connection so Subscribe/Unsubscribe return ErrDisconnected.
+	c.conn = nil
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancelReconnect = cancel
 	c.mu.Unlock()
@@ -255,28 +313,37 @@ func (c *Client) reconnect() {
 			c.mu.Unlock()
 		}()
 
+		rng := newRng()
 		backoff := c.opts.InitialBackoff
 		attempts := 0
 
 		for {
 			select {
 			case <-ctx.Done():
+				c.shutdown()
 				return
 			default:
 			}
 
 			if c.opts.MaxReconnectAttempts > 0 && attempts >= c.opts.MaxReconnectAttempts {
+				c.shutdown()
 				return
 			}
 			attempts++
 
+			// Apply +/- 20% jitter using seeded RNG.
+			jitter := (rng.Float64() * 0.4) - 0.2 // range [-0.2, 0.2)
+			sleepDuration := time.Duration(float64(backoff) * (1.0 + jitter))
+
 			select {
 			case <-ctx.Done():
 				return
-			case <-time.After(backoff):
+			case <-time.After(sleepDuration):
 			}
 
-			conn, _, err := websocket.Dial(context.Background(), c.url, nil)
+			dialCtx, dialCancel := context.WithTimeout(context.Background(), dialTimeout)
+			conn, _, err := websocket.Dial(dialCtx, c.url, nil)
+			dialCancel()
 			if err != nil {
 				// Exponential backoff with cap.
 				backoff = backoff * 2
@@ -300,6 +367,7 @@ func (c *Client) reconnect() {
 				if err := c.writeSubscribe(subs); err != nil {
 					c.mu.Lock()
 					c.conn.Close(websocket.StatusNormalClosure, "")
+					c.conn = nil
 					c.mu.Unlock()
 					backoff = backoff * 2
 					if backoff > c.opts.MaxBackoff {

@@ -1,0 +1,284 @@
+{
+  "annotations": { "list": [] },
+  "description": "High-level platform health for operations, SRE, and incident commanders. Answers: Is the platform healthy? Are clients connected? Are messages flowing?",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Gateway Performance", "url": "/d/gateway-perf", "type": "link" },
+    { "title": "Redis Health", "url": "/d/redis-health", "type": "link" },
+    { "title": "Reliability", "url": "/d/reliability", "type": "link" }
+  ],
+  "panels": [
+    {
+      "title": "Active WebSocket Connections",
+      "description": "Current number of connected WebSocket clients across all gateways. A sudden drop indicates gateway failure, load balancer issue, or network outage.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 100 },
+              { "color": "green", "value": 1000 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rtmds_websocket_connections_active)",
+          "legendFormat": "connections",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dropped Messages",
+      "description": "Total events dropped due to backpressure or queue overflow. Should normally be zero. Any sustained non-zero value indicates slow consumers or capacity issues.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 8, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_distribution_events_dropped_total[5m]))",
+          "legendFormat": "dropped/5m",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Slow Consumers",
+      "description": "Current number of clients experiencing backpressure. These clients are at risk of disconnection after maxConsecutiveDrops (100 missed messages).",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 8, "x": 16, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rtmds_websocket_slow_consumers)",
+          "legendFormat": "slow consumers",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Cluster Throughput",
+      "description": "Messages per second over time, broken down by feed provider with TOTAL aggregate. This is the primary indicator of data flow health. A flat line at zero means the feed is down.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "gradientMode": "scheme",
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_feed_messages_received_total[1m])) by (provider)",
+          "legendFormat": "{{ provider }}",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(rtmds_feed_messages_received_total[1m]))",
+          "legendFormat": "TOTAL",
+          "refId": "B",
+          "hide": false
+        }
+      ]
+    },
+    {
+      "title": "Delivery Latency P50 / P95 / P99",
+      "description": "End-to-end latency from event creation to WebSocket delivery. P99 > 500ms means clients see stale data. P95 > 100ms indicates emerging bottleneck.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rtmds_websocket_delivery_latency_seconds_bucket[5m]))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rtmds_websocket_delivery_latency_seconds_bucket[5m]))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(rtmds_websocket_delivery_latency_seconds_bucket[5m]))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Connection Trend",
+      "description": "WebSocket connections over time. Sudden drops indicate incidents; steady growth indicates capacity planning needs.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rtmds_websocket_connections_active)",
+          "legendFormat": "active connections",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(rtmds_websocket_connections_opened_total[5m])) * 300",
+          "legendFormat": "opens/5m",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Data Staleness",
+      "description": "Seconds since the most recent exchange timestamp. High staleness means the feed is delayed or stopped. Normal is < 1 second.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "s",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 2 },
+              { "color": "red", "value": 10 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "rtmds_feed_data_staleness_seconds",
+          "legendFormat": "staleness",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "HTTP Request Rate",
+      "description": "HTTP requests per second by route. Shows replay, snapshot, and health check activity. Spikes in /replay indicate client recovery events.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_http_requests_total[5m])) by (route)",
+          "legendFormat": "{{ route }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Feed Errors",
+      "description": "Feed errors by provider and kind. Persistent errors indicate upstream data quality issues or network problems.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_feed_errors_total[5m])) by (provider, kind)",
+          "legendFormat": "{{ provider }}: {{ kind }}",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["rtmds", "executive", "overview"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "RTMDS Executive Overview",
+  "uid": "executive-overview",
+  "version": 1
+}

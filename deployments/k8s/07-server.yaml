@@ -1,0 +1,133 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rtmds-server
+  namespace: rtmds
+  labels:
+    app: rtmds-server
+spec:
+  ports:
+    - port: 8080
+      name: http
+  selector:
+    app: rtmds-server
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rtmds-server
+  namespace: rtmds
+spec:
+  replicas: 3
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: rtmds-server
+  template:
+    metadata:
+      labels:
+        app: rtmds-server
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - rtmds-server
+                topologyKey: "kubernetes.io/hostname"
+      securityContext:
+        fsGroup: 10001
+        runAsUser: 10001
+        runAsNonRoot: true
+      containers:
+        - name: rtmds-server
+          image: rtmds:local
+          imagePullPolicy: Never # We load this directly into kind
+          envFrom:
+            - configMapRef:
+                name: rtmds-config
+          env:
+            - name: RTMDS_DATABASE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rtmds-secrets
+                  key: postgres_password
+            - name: RTMDS_REDIS_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rtmds-secrets
+                  key: redis_password
+            - name: RTMDS_REDIS_ADDR
+              value: "redis.rtmds.svc.cluster.local:6379"
+            - name: GOMEMLIMIT
+              value: "460MiB"
+          ports:
+            - containerPort: 8080
+              name: http
+          volumeMounts:
+            - name: server-snapshot
+              mountPath: /data
+          securityContext:
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "128Mi"
+            limits:
+              cpu: "2000m"
+              memory: "512Mi"
+          startupProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            failureThreshold: 10
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 3
+      volumes:
+        - name: server-snapshot
+          emptyDir: {}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: rtmds-server-hpa
+  namespace: rtmds
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: rtmds-server
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 70

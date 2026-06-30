@@ -20,6 +20,7 @@ BUILD_TIME  := $(shell date -u +%Y-%m-%dT%H:%M:%SZ)
         dev-up dev-shell dev-test dev-redis dev-down \
         gw-up gw-down gw-logs gw-health gw-test \
         sticky-up sticky-down sticky-logs sticky-health sticky-test \
+        trace-up trace-down trace-gw-up trace-gw-down trace-traffic trace-verify trace-edge trace-logs \
         discovery-up discovery-down discovery-logs discovery-gateways clean help
 
 
@@ -202,6 +203,50 @@ sticky-test:
 	@echo "With least_conn, requests should distribute across gateways."
 	@echo "Clients own subscription state and re-send on reconnect (fat client)."
 
+# ── Distributed Tracing (OpenTelemetry + Jaeger) ─────────────────────────────
+## trace-up: Start gateway + Jaeger (single gateway for trace verification)
+trace-up:
+	docker compose -f docker-compose.otel.yml up --build -d
+	@echo "✓ Tracing stack up"
+	@echo "  Gateway: http://localhost:9091"
+	@echo "  Jaeger:  http://localhost:16686"
+	@echo "  OTLP:    http://localhost:4318/v1/traces"
+	@echo ""
+	@echo "Next: make trace-traffic && make trace-verify"
+
+## trace-down: Tear down the tracing stack
+trace-down:
+	docker compose -f docker-compose.otel.yml down -v
+
+## trace-gw-up: Start 3 gateways + Jaeger (distributed tracing verification)
+trace-gw-up:
+	docker compose -f docker-compose.trace.yml up --build -d
+	@echo "✓ Distributed tracing stack up"
+	@echo "  Gateway 1: http://localhost:9091"
+	@echo "  Gateway 2: http://localhost:9092"
+	@echo "  Gateway 3: http://localhost:9093"
+	@echo "  Jaeger:    http://localhost:16686"
+
+## trace-gw-down: Tear down the distributed tracing stack
+trace-gw-down:
+	docker compose -f docker-compose.trace.yml down -v
+
+## trace-traffic: Generate test traffic for trace verification
+trace-traffic:
+	./scripts/trace_traffic.sh
+
+## trace-verify: Run automated trace verification checks
+trace-verify:
+	./scripts/trace_verify.sh
+
+## trace-edge: Run edge case tracing tests (gateway restart, Redis restart, etc.)
+trace-edge:
+	./scripts/trace_edge_cases.sh
+
+## trace-logs: Tail logs from the tracing stack
+trace-logs:
+	docker compose -f docker-compose.otel.yml logs -f
+
 # ── Service Discovery Deployment ──────────────────────────────────────────────
 ## discovery-up: Start Nginx + 3 gateways + Redis with service discovery
 discovery-up:
@@ -233,6 +278,18 @@ discovery-gateways:
 	done
 
 # ── Utilities ─────────────────────────────────────────────────────────────────
+## stress-test: Run automated progressive stress testing to find saturation point
+stress-test:
+	./scripts/run_stress_test.sh
+
+## soak-test: Run extended stability and memory leak test
+soak-test:
+	./scripts/run_soak_test.sh
+
+## spike-test: Run burst traffic test to observe system recovery
+spike-test:
+	./scripts/run_spike_test.sh
+
 ## clean: Remove build artifacts
 clean:
 	rm -rf $(BUILD_DIR) coverage.out

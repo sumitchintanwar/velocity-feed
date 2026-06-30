@@ -7,9 +7,11 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/feed"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/pubsub"
+	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/websocket"
 )
@@ -19,7 +21,7 @@ import (
 func BenchmarkBackpressure_SlowConsumer(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_bp_slow")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	var fastDelivered atomic.Int64
 	fastSubs := make([]pubsub.Subscription, 10)
@@ -41,7 +43,7 @@ func BenchmarkBackpressure_SlowConsumer(b *testing.B) {
 		}
 	}()
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -80,7 +82,7 @@ func BenchmarkBackpressure_SlowConsumer(b *testing.B) {
 func BenchmarkBackpressure_SlowRatio(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_bp_ratio")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	var fastDelivered atomic.Int64
 	var slowDelivered atomic.Int64
@@ -103,7 +105,7 @@ func BenchmarkBackpressure_SlowRatio(b *testing.B) {
 		}
 	}()
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -139,7 +141,7 @@ func BenchmarkBackpressure_SlowRatio(b *testing.B) {
 func BenchmarkBackpressure_BurstLoad(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_bp_burst")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	var delivered atomic.Int64
 	subs := make([]pubsub.Subscription, 100)
@@ -152,7 +154,7 @@ func BenchmarkBackpressure_BurstLoad(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -197,13 +199,13 @@ func BenchmarkBackpressure_BurstLoad(b *testing.B) {
 func BenchmarkBackpressure_Gateway(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_bp_gw")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 	tm := topicmanager.New(0)
 	gw := websocket.NewGateway(tm, log, m, 500, "test-gw")
 
 	_ = gw
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -227,8 +229,8 @@ func BenchmarkBackpressure_Gateway(b *testing.B) {
 // ---------- Subscription Churn ----------
 
 func BenchmarkBackpressure_SubscriptionChurn(b *testing.B) {
-	m, log := newBenchMetrics("bench_bp_churn")
-	bus := pubsub.NewMemoryBus(log, m)
+	m, _ := newBenchMetrics("bench_bp_churn")
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 	ctx := context.Background()
 
 	// Pre-publish so snapshot has data.

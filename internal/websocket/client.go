@@ -9,10 +9,14 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
+	"github.com/sumit/rtmds/internal/sequencer"
+	"github.com/sumit/rtmds/internal/snapshot"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	wscontext "github.com/sumit/rtmds/internal/correlation/websocket"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 // bufferPool reuses bytes.Buffer instances to reduce GC pressure.
@@ -30,8 +34,9 @@ const (
 	// CH2: Maximum symbols a client can subscribe to in one request.
 	maxSymbolsPerSubscription = 100
 
-	// SC2: Control channel capacity.
-	controlQueueSize = 64
+	// SC2: Control channel capacity. Must exceed maxSymbolsPerSubscription (100)
+	// to prevent drops when a client receives a confirmation + N snapshots on subscribe.
+	controlQueueSize = 128
 )
 
 // Client represents a single WebSocket connection. Each client owns:
@@ -46,8 +51,13 @@ type Client struct {
 	id      string
 	conn    *websocket.Conn
 	tm      topicmanager.Manager
-	log     zerolog.Logger
+	snap    *snapshot.Service // optional; nil disables snapshot delivery
+	seqVal  *sequencer.Validator
+	log     *log.Logger
 	metrics *platform.Metrics
+
+	// heartbeat tracks this client's pong timestamps for dead connection detection.
+	heartbeat *HeartbeatManager
 
 	// control is a channel for control messages (errors, confirmations)
 	// from readPump to writePump. This ensures all socket writes
@@ -75,18 +85,18 @@ type Client struct {
 
 	// SC1: consecutive drops counter for slow consumer detection.
 	consecutiveDrops atomic.Int64
-
-	// lastPingSent records when the last ping was sent for RTT measurement.
-	lastPingSent atomic.Int64 // unix nanoseconds
 }
 
-func newClient(id string, conn *websocket.Conn, tm topicmanager.Manager, log zerolog.Logger, cancelCtx context.CancelFunc, metrics *platform.Metrics) *Client {
+func newClient(id string, conn *websocket.Conn, tm topicmanager.Manager, snap *snapshot.Service, l *log.Logger, cancelCtx context.CancelFunc, metrics *platform.Metrics, heartbeat *HeartbeatManager) *Client {
 	return &Client{
 		id:         id,
 		conn:       conn,
 		tm:         tm,
-		log:        log,
+		snap:       snap,
+		seqVal:     sequencer.NewValidator(),
+		log:        l,
 		metrics:    metrics,
+		heartbeat:  heartbeat,
 		control:    make(chan ServerMessage, controlQueueSize),
 		subUpdated: make(chan struct{}, 1),
 		cancelCtx:  cancelCtx,
@@ -109,13 +119,13 @@ func (c *Client) readPump(ctx context.Context) {
 	}()
 
 	c.conn.SetReadLimit(maxMessageSize)
-	_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
+	// SetReadDeadline is removed here to fulfill the design goal of 
+	// "centralized timeout detection without per-connection timers" 
+	// via HeartbeatManager.
 	c.conn.SetPongHandler(func(string) error {
-		_ = c.conn.SetReadDeadline(time.Now().Add(pongWait))
-		// Record ping RTT if a ping was recently sent.
-		if sent := c.lastPingSent.Load(); sent > 0 {
-			rtt := time.Since(time.Unix(0, sent))
-			c.metrics.WSPingLatency.Observe(rtt.Seconds())
+		// Record pong with heartbeat manager for timeout detection.
+		if c.heartbeat != nil {
+			c.heartbeat.RecordPong(c.id)
 		}
 		return nil
 	})
@@ -124,26 +134,26 @@ func (c *Client) readPump(ctx context.Context) {
 		_, msg, err := c.conn.ReadMessage()
 		if err != nil {
 			if websocket.IsCloseError(err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-				c.log.Debug().Msg("client closed connection")
+				log.Debug(ctx, c.log).Str("event", "client_closed_connection").Msg("client closed connection")
 			} else {
-				c.log.Error().Err(err).Msg("read error")
+				log.Error(ctx, c.log).Err(err).Str("event", "read_error").Msg("read error")
 			}
 			return
 		}
 
 		var cm ClientMessage
 		if err := json.Unmarshal(msg, &cm); err != nil {
-			c.log.Warn().Err(err).Msg("invalid message")
+			log.Warn(ctx, c.log).Err(err).Str("event", "invalid_message").Msg("invalid message")
 			c.sendControl(ServerMessage{Type: "error", Payload: "invalid message format"})
 			continue
 		}
 
-		c.handleMessage(cm)
+		c.handleMessage(ctx, cm)
 	}
 }
 
 // handleMessage dispatches a client message to the appropriate action.
-func (c *Client) handleMessage(cm ClientMessage) {
+func (c *Client) handleMessage(ctx context.Context, cm ClientMessage) {
 	switch cm.Action {
 	case "subscribe":
 		if len(cm.Symbols) == 0 {
@@ -155,6 +165,14 @@ func (c *Client) handleMessage(cm ClientMessage) {
 			c.sendControl(ServerMessage{Type: "error", Payload: "too many symbols (max 100)"})
 			return
 		}
+
+		// Trace boundary: "subscription_request" — covers the full subscribe
+		// operation: TopicManager registration + snapshot fetch + Redis subscribe.
+		// This is a key trace target per the design spec for client onboarding latency.
+		subCtx, span := wscontext.DeriveMessageContext(ctx, "websocket.subscription_request")
+		span.SetAttributes(attribute.Int("subscription.symbol_count", len(cm.Symbols)))
+		defer span.End()
+
 		// Cancel previous subscription if any.
 		c.handleMu.Lock()
 		if c.handle != nil {
@@ -170,7 +188,19 @@ func (c *Client) handleMessage(cm ClientMessage) {
 		default:
 		}
 		c.sendControl(ServerMessage{Type: "subscribed", Payload: cm.Symbols})
-		c.log.Info().Strs("symbols", cm.Symbols).Msg("subscribed")
+		log.Info(ctx, c.log).Strs("symbols", cm.Symbols).Str("event", "client_subscribed").Msg("subscribed")
+
+		// Send current snapshots before live streaming begins.
+		// This ensures new subscribers see current market state immediately.
+		if c.snap != nil {
+			// Pass the subscription span context so snapshot.lookup and
+			// snapshot.request are children of subscription_request.
+			cached := c.snap.GetMultiple(subCtx, cm.Symbols)
+			span.SetAttributes(attribute.Int("snapshot.cached_count", len(cached)))
+			for _, ce := range cached {
+				c.sendControl(ServerMessage{Type: "snapshot", Payload: ce})
+			}
+		}
 
 	case "unsubscribe":
 		c.handleMu.Lock()
@@ -201,6 +231,12 @@ func (c *Client) handleMessage(cm ClientMessage) {
 // eliminating redundant JSON serialization per-client.
 //
 // GL3: writePump owns the connection and closes it on exit.
+//
+// [ASYMMETRIC TRACING RULE]: Outbound market data streams (via CachedEvent) MUST NOT
+// generate child spans or message contexts. At production scale, generating a span
+// per outbound websocket frame will trigger catastrophic Span Explosion (e.g. 10M+
+// spans per second). Tracing is limited strictly to inbound control messages (e.g. Subscribe).
+// Do NOT add tracing middleware to the eventC loop.
 func (c *Client) writePump(ctx context.Context) {
 	ticker := time.NewTicker(pingPeriod)
 	defer func() {
@@ -243,14 +279,27 @@ func (c *Client) writePump(ctx context.Context) {
 				doneC = nil
 				continue
 			}
+			// Validate ordering when the wrapped event carries a sequence number.
+			if seqEv, ok := cached.Event.(marketdata.SequencedEvent); ok {
+				seq := seqEv.GetSeq()
+				if seq > 0 {
+					result, gap := c.seqVal.Validate(cached.EventSymbol(), seq)
+					if result == sequencer.OutOfOrder {
+						c.metrics.WSSequenceGaps.Inc()
+					}
+					if gap != nil {
+						c.metrics.WSSequenceGaps.Inc()
+					}
+				}
+			}
 			// Record end-to-end delivery latency from event timestamp.
-			if te, ok := cached.Event.(interface{ GetTimestamp() time.Time }); ok {
+			if te, ok := cached.Event.(marketdata.TimestampedEvent); ok {
 				latency := time.Since(te.GetTimestamp())
 				c.metrics.WSDeliveryLatency.Observe(latency.Seconds())
 			}
 			// Use pre-encoded bytes from CachedEvent — zero serialization overhead.
 			if err := c.writeRaw(cached.EncodedMsg); err != nil {
-				c.log.Error().Err(err).Msg("write error")
+				log.Error(ctx, c.log).Err(err).Str("event", "write_error").Msg("write error")
 				c.metrics.WSWriteErrors.Inc()
 				return
 			}
@@ -261,7 +310,7 @@ func (c *Client) writePump(ctx context.Context) {
 
 		case msg := <-c.control:
 			if err := c.writeJSON(msg); err != nil {
-				c.log.Error().Err(err).Msg("control write error")
+				log.Error(ctx, c.log).Err(err).Str("event", "control_write_error").Msg("control write error")
 				return
 			}
 
@@ -276,13 +325,16 @@ func (c *Client) writePump(ctx context.Context) {
 			return
 
 		case <-ticker.C:
-			c.lastPingSent.Store(time.Now().UnixNano())
+			// Record ping with heartbeat manager for timeout detection.
+			if c.heartbeat != nil {
+				c.heartbeat.RecordPing(c.id)
+			}
 			if err := c.conn.WriteControl(
 				websocket.PingMessage,
 				nil,
 				time.Now().Add(writeWait),
 			); err != nil {
-				c.log.Error().Err(err).Msg("ping failed")
+				log.Error(ctx, c.log).Err(err).Str("event", "ping_failed").Msg("ping failed")
 				return
 			}
 		}
@@ -332,7 +384,7 @@ func (c *Client) sendControl(msg ServerMessage) {
 	case c.control <- msg:
 	default:
 		// SC2: Control channel full — log warning instead of silently dropping.
-		c.log.Warn().Str("type", msg.Type).Msg("control channel full, dropping message")
+		c.log.Underlying().Warn().Str("type", msg.Type).Str("event", "control_channel_full").Msg("control channel full, dropping message")
 	}
 }
 
@@ -353,6 +405,10 @@ func (c *Client) cancelAll() {
 // GL1: Sets a read deadline after cancelCtx to force ReadMessage to return
 // immediately instead of blocking for up to pongWait (60s).
 func (c *Client) shutdown(ctx context.Context) {
+	// Execute the disconnect span to trace the duration of the graceful teardown.
+	_, span := wscontext.DeriveMessageContext(ctx, "websocket.disconnect")
+	defer span.End()
+
 	// GL1: Cancel context to signal readPump and writePump.
 	c.cancelCtx()
 

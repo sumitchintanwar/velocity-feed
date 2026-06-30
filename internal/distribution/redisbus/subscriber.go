@@ -7,9 +7,12 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/internal/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Subscriber listens on Redis Pub/Sub channels and forwards received
@@ -31,7 +34,7 @@ type Subscriber struct {
 	client  *redis.Client
 	prefix  string
 	tm      topicmanager.Manager
-	log     zerolog.Logger
+	log     *log.Logger
 	cancel  context.CancelFunc
 	doneCh  chan struct{}
 
@@ -81,12 +84,12 @@ var defaultStaleThreshold = 5 * time.Second
 // NewSubscriber creates a Redis-backed Subscriber that forwards events to the
 // given local TopicManager. Call Start() to begin listening, then
 // Subscribe()/Unsubscribe() to manage per-symbol channels.
-func NewSubscriber(client *redis.Client, tm topicmanager.Manager, log zerolog.Logger, opts ...SubscriberOption) *Subscriber {
+func NewSubscriber(client *redis.Client, tm topicmanager.Manager, l *log.Logger, opts ...SubscriberOption) *Subscriber {
 	s := &Subscriber{
 		client:         client,
 		prefix:         ChannelPrefix,
 		tm:             tm,
-		log:            log,
+		log:            l,
 		doneCh:         make(chan struct{}),
 		channels:       make(map[string]struct{}),
 		staleThreshold: defaultStaleThreshold,
@@ -113,7 +116,8 @@ func (s *Subscriber) Start(ctx context.Context) {
 				subs = append(subs, s.prefix+sym)
 			}
 			if err := s.pubsub.Subscribe(ctx, subs...); err != nil {
-				s.log.Warn().Err(err).Msg("redis-subscriber: initial subscribe failed")
+				s.log.Underlying().Warn().Err(err).Str("event", "initial_subscribe_failed").
+					Msg("redis-subscriber: initial subscribe failed")
 			}
 		}
 		s.pubsubMu.Unlock()
@@ -140,7 +144,8 @@ func (s *Subscriber) Subscribe(symbol string) {
 	if ps != nil {
 		ch := s.prefix + symbol
 		if err := ps.Subscribe(context.Background(), ch); err != nil {
-			s.log.Warn().Err(err).Str("symbol", symbol).
+			s.log.Underlying().Warn().Err(err).Str("symbol", symbol).
+				Str("event", "subscribe_failed").
 				Msg("redis-subscriber: failed to subscribe")
 		}
 	}
@@ -174,7 +179,8 @@ func (s *Subscriber) SubscribeBatch(symbols []string) {
 
 	if ps != nil {
 		if err := ps.Subscribe(context.Background(), chs...); err != nil {
-			s.log.Warn().Err(err).Int("count", len(chs)).
+			s.log.Underlying().Warn().Err(err).Int("count", len(chs)).
+				Str("event", "batch_subscribe_failed").
 				Msg("redis-subscriber: batch subscribe failed")
 		}
 	}
@@ -194,7 +200,8 @@ func (s *Subscriber) Unsubscribe(symbol string) {
 	if ps != nil {
 		ch := s.prefix + symbol
 		if err := ps.Unsubscribe(context.Background(), ch); err != nil {
-			s.log.Warn().Err(err).Str("symbol", symbol).
+			s.log.Underlying().Warn().Err(err).Str("symbol", symbol).
+				Str("event", "unsubscribe_failed").
 				Msg("redis-subscriber: failed to unsubscribe")
 		}
 	}
@@ -239,11 +246,11 @@ func (s *Subscriber) listen(ctx context.Context) {
 
 	ch := s.pubsub.Channel()
 	if ch == nil {
-		s.log.Error().Msg("redis-subscriber: failed to get channel")
+		s.log.Underlying().Error().Str("event", "channel_get_failed").Msg("redis-subscriber: failed to get channel")
 		return
 	}
 
-	s.log.Info().Msg("redis-subscriber: listening")
+	s.log.Underlying().Info().Str("event", "redis_listening").Msg("redis-subscriber: listening")
 
 	// Staleness check timer — fires every second to detect Redis outages.
 	staleTicker := time.NewTicker(time.Second)
@@ -253,7 +260,7 @@ func (s *Subscriber) listen(ctx context.Context) {
 		select {
 		case msg, ok := <-ch:
 			if !ok {
-				s.log.Info().Msg("redis-subscriber: channel closed")
+				s.log.Underlying().Info().Str("event", "channel_closed").Msg("redis-subscriber: channel closed")
 				return
 			}
 			// Record last message time for staleness detection.
@@ -267,7 +274,7 @@ func (s *Subscriber) listen(ctx context.Context) {
 			s.checkStaleness()
 
 		case <-ctx.Done():
-			s.log.Info().Msg("redis-subscriber: shutting down")
+			s.log.Underlying().Info().Str("event", "redis_shutting_down").Msg("redis-subscriber: shutting down")
 			return
 		}
 	}
@@ -286,7 +293,8 @@ func (s *Subscriber) checkStaleness() {
 	elapsed := time.Since(time.Unix(0, last))
 	if elapsed > s.staleThreshold {
 		s.staleOnce.Do(func() {
-			s.log.Warn().Dur("since_last", elapsed).
+			s.log.Underlying().Warn().Dur("since_last", elapsed).
+				Str("event", "stale_data_detected").
 				Msg("redis-subscriber: stale data detected, invoking callback")
 			s.onStale()
 		})
@@ -304,20 +312,42 @@ func (s *Subscriber) IsStale() bool {
 }
 
 // handleMessage deserializes a Redis message and forwards it to the local
-// TopicManager.
+// TopicManager. Creates a "redis.consume" span to trace the consume operation.
+// Span attributes follow low-cardinality rules: channel, operation.
+//
+// Trace propagation: extracts the producer's trace context from the wire
+// envelope, making this consumer span a child of the producer span. This
+// creates a distributed trace: Pipeline → redis.publish → redis.consume → Client.
 func (s *Subscriber) handleMessage(ctx context.Context, payload string, channel string) {
 	var env wireEnvelope
 	if err := jsonLib.Unmarshal([]byte(payload), &env); err != nil {
-		s.log.Warn().Err(err).Msg("redis-subscriber: failed to unmarshal envelope")
+		s.log.Underlying().Warn().Err(err).Str("event", "envelope_unmarshal_failed").
+			Msg("redis-subscriber: failed to unmarshal envelope")
 		return
 	}
 
-	// Reconstruct the Quote from the raw JSON.
-	var event marketdata.Quote
-	if err := jsonLib.Unmarshal(env.Raw, &event); err != nil {
-		s.log.Warn().Err(err).Str("type", env.Type).
-			Msg("redis-subscriber: failed to unmarshal event")
-		return
+	// Extract producer trace context from the envelope.
+	// This makes the consumer span a child of the producer span,
+	// creating a single distributed trace across the Redis boundary.
+	ctx = tracing.ExtractTraceContext(ctx, env.TraceCtx)
+
+	ctx, span := tracing.TracerForComponent("redis").Start(ctx, "redis.consume",
+		trace.WithSpanKind(trace.SpanKindConsumer),
+		trace.WithAttributes(
+			attribute.String("redis.channel", channel),
+			attribute.String("redis.operation", "consume"),
+		),
+	)
+	defer span.End()
+
+	// Reconstruct the event from the raw JSON envelope, without parsing the inner marketdata JSON.
+	// This maintains the zero-copy optimization for the Gateway.
+	event := marketdata.PreEncodedEvent{
+		Symbol:     env.Symbol,
+		Typ:        env.Type,
+		SeqNum:     env.Seq,
+		Time:       env.Timestamp,
+		EncodedMsg: env.Raw,
 	}
 
 	s.received.Add(1)

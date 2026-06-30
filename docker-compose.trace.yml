@@ -1,0 +1,132 @@
+# Multi-Gateway Architecture with OpenTelemetry Tracing
+#
+# 1 Redis + 3 gateways + Jaeger:
+#   - gateway1 (port 9091): Primary — feed + publisher + subscriber
+#   - gateway2 (port 9092): Subscriber-only
+#   - gateway3 (port 9093): Subscriber-only
+#   - jaeger (port 16686): Trace backend + UI
+#
+# Quick start:
+#   make trace-gw-up
+#
+# Verify:
+#   curl http://localhost:9091/health
+#   curl http://localhost:16686/api/services
+#
+# Tear down:
+#   make trace-gw-down
+
+services:
+  redis:
+    image: redis:7.4-alpine
+    container_name: rtmds-redis-trace
+    ports:
+      - "6379:6379"
+    command: redis-server --save "" --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - trace-net
+
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: rtmds-jaeger-trace
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+      - "4318:4318"
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:16686/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+      start_period: 5s
+    networks:
+      - trace-net
+
+  gateway1:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gw1-trace
+    ports:
+      - "9091:9091"
+    environment:
+      RTMDS_SERVER_PORT: "9091"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "true"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+      RTMDS_TRACING_ENABLED: "true"
+      RTMDS_TRACING_ENDPOINT: "jaeger:4318"
+      RTMDS_TRACING_SAMPLE_RATIO: "1.0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - trace-net
+
+  gateway2:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gw2-trace
+    ports:
+      - "9092:9092"
+    environment:
+      RTMDS_SERVER_PORT: "9092"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+      RTMDS_TRACING_ENABLED: "true"
+      RTMDS_TRACING_ENDPOINT: "jaeger:4318"
+      RTMDS_TRACING_SAMPLE_RATIO: "1.0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - trace-net
+
+  gateway3:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rtmds-gw3-trace
+    ports:
+      - "9093:9093"
+    environment:
+      RTMDS_SERVER_PORT: "9093"
+      RTMDS_REDIS_ENABLED: "true"
+      RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_FEED_ENABLED: "false"
+      RTMDS_FEED_SYMBOLS: "AAPL,MSFT,GOOG,AMZN,TSLA"
+      RTMDS_LOG_LEVEL: "info"
+      RTMDS_LOG_FORMAT: "json"
+      RTMDS_TRACING_ENABLED: "true"
+      RTMDS_TRACING_ENDPOINT: "jaeger:4318"
+      RTMDS_TRACING_SAMPLE_RATIO: "1.0"
+    depends_on:
+      redis:
+        condition: service_healthy
+      jaeger:
+        condition: service_healthy
+    networks:
+      - trace-net
+
+networks:
+  trace-net:
+    driver: bridge

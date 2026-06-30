@@ -1,0 +1,235 @@
+{
+  "annotations": { "list": [] },
+  "description": "Support long-term scaling decisions: throughput trends, connection growth, Redis resource usage, and gateway utilization. Answers: When will capacity be exhausted?",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Executive Overview", "url": "/d/executive-overview", "type": "link" },
+    { "title": "Gateway Performance", "url": "/d/gateway-perf", "type": "link" }
+  ],
+  "panels": [
+    {
+      "title": "Throughput Trend",
+      "description": "Messages per second over time. Use 7d/30d/90d time ranges to identify growth trends. A 2x increase in 90 days means capacity needs to double.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_feed_messages_received_total[5m]))",
+          "legendFormat": "current",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(increase(rtmds_feed_messages_received_total[7d])) / (7 * 86400)",
+          "legendFormat": "7d avg",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Connection Growth",
+      "description": "WebSocket connections over time. Steady growth indicates increasing client adoption. Plan gateway capacity before connections reach limits.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(rtmds_websocket_connections_active)",
+          "legendFormat": "active connections",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Replay Volume Trend",
+      "description": "Replay requests over time. Persistent elevated replay volume indicates recurring instability or large client populations recovering.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_http_requests_total{route=\"/replay\"}[5m]))",
+          "legendFormat": "replay req/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Redis Memory Growth",
+      "description": "Redis memory consumption over time. A steady increase means subscription growth or payload size increase. Plan Redis capacity before hitting maxmemory.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "bytes"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "targets": [
+        {
+          "expr": "redis_memory_used_bytes",
+          "legendFormat": "used",
+          "refId": "A"
+        },
+        {
+          "expr": "redis_memory_max_bytes",
+          "legendFormat": "max",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Gateway Utilization",
+      "description": "Messages written per gateway. Uneven distribution means load balancer needs tuning. Equal distribution means all gateways share load.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_websocket_messages_written_total[5m])) by (instance)",
+          "legendFormat": "{{ instance }}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Bandwidth Utilization",
+      "description": "WebSocket bytes sent per second. Growing bandwidth usage indicates more data per client or more clients. Plan network capacity accordingly.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "Bps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_websocket_bytes_sent_total[5m]))",
+          "legendFormat": "total bytes/sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dropped Messages Trend",
+      "description": "Dropped messages over time. A growing trend means capacity is being exceeded. Plan scale-out before drops become sustained.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 24 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_distribution_events_dropped_total[5m]))",
+          "legendFormat": "drops/sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Worker Pool Queue Depth",
+      "description": "Current worker pool queue depth. Growing queue depth means workers can't keep up with incoming load. Plan more workers or gateways.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 24 },
+      "targets": [
+        {
+          "expr": "rtmds_worker_queue_depth",
+          "legendFormat": "queue depth",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["rtmds", "capacity", "planning"],
+  "templating": { "list": [] },
+  "time": { "from": "now-30d", "to": "now" },
+  "timepicker": {
+    "refresh_intervals": ["5m", "15m", "1h", "6h", "12h", "1d", "7d", "30d"]
+  },
+  "timezone": "utc",
+  "title": "RTMDS Capacity Planning",
+  "uid": "capacity-planning",
+  "version": 1
+}

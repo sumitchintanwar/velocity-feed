@@ -1,0 +1,68 @@
+apiVersion: 1
+
+providers:
+  - name: 'RTMDS Executive'
+    orgId: 1
+    folder: '00 Executive'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/00-executive
+      foldersFromFilesStructure: false
+
+  - name: 'RTMDS Platform'
+    orgId: 1
+    folder: '10 Platform'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/10-platform
+      foldersFromFilesStructure: false
+
+  - name: 'RTMDS Services'
+    orgId: 1
+    folder: '20 Services'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/20-services
+      foldersFromFilesStructure: true
+
+  - name: 'RTMDS Infrastructure'
+    orgId: 1
+    folder: '30 Infrastructure'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/30-infrastructure
+      foldersFromFilesStructure: true
+
+  - name: 'RTMDS Reliability'
+    orgId: 1
+    folder: '50 Reliability'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/50-reliability
+      foldersFromFilesStructure: false
+
+  - name: 'RTMDS Performance'
+    orgId: 1
+    folder: '60 Performance'
+    type: file
+    disableDeletion: false
+    editable: false
+    updateIntervalSeconds: 30
+    options:
+      path: /var/lib/grafana/dashboards/60-performance
+      foldersFromFilesStructure: false

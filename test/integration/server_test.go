@@ -7,14 +7,15 @@ package integration
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	gws "github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/config"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
@@ -36,17 +37,17 @@ func (m *mockHealthReporter) HealthReport(ctx context.Context) map[string]platfo
 func buildTestServer(t *testing.T) (wsURL string, tm topicmanager.Manager, cancel context.CancelFunc) {
 	t.Helper()
 
-	log := zerolog.Nop()
+	logger := log.New(io.Discard, "integration-test")
 	metrics, gatherer := platform.NewMetrics("test")
 
 	tm = topicmanager.New(0)
-	gw := websocket.NewGateway(tm, log, metrics, 0)
+	gw := websocket.NewGateway(tm, logger, metrics, 0)
 
 	cfg := &config.Config{
 		Metrics: config.MetricsConfig{Enabled: false},
 	}
 
-	router := transport.NewRouter(cfg, gw, log, metrics, gatherer, &mockHealthReporter{}, nil)
+	router := transport.NewRouter(cfg, gw, logger, metrics, gatherer, &mockHealthReporter{}, nil, nil, nil, nil, nil)
 	ts := httptest.NewServer(router)
 	t.Cleanup(ts.Close)
 

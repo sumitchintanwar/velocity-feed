@@ -1,0 +1,35 @@
+groups:
+- name: performance
+  rules:
+  - alert: HighEndToEndLatency
+    expr: histogram_quantile(0.99, sum(rate(end_to_end_latency_seconds_bucket[5m]))
+      by (le)) > (avg_over_time(histogram_quantile(0.99, sum(rate(end_to_end_latency_seconds_bucket[5m]))
+      by (le))[1h:5m]) * 1.5)
+    for: 5m
+    labels:
+      severity: high
+      team: market_data
+      category: latency
+    annotations:
+      summary: P99 End-to-End Latency Spike
+      description: Latency has spiked > 50% above the 1-hour moving average.
+      runbook_url: https://wiki.internal/runbooks/performance/high-latency
+      dashboard_url: /d/market-data-operations
+      related_traces: service=rtmds-gateway
+      related_metrics: histogram_quantile(0.99, sum(rate(end_to_end_latency_seconds_bucket[5m]))
+        by (le)) > (avg_over_time(histogram_quantile(0.99, sum(rate(end_to_end_latency_seconds_bucket[5m]))
+        by (le))[1h:5m]) * 1.5)
+  - alert: HighGCPauses
+    expr: rate(go_gc_duration_seconds_sum[5m]) > 0.05
+    for: 5m
+    labels:
+      severity: warning
+      team: platform
+      category: runtime
+    annotations:
+      summary: High GC Pauses
+      description: GC pauses are increasing.
+      runbook_url: https://wiki.internal/runbooks/performance/gc-pauses
+      dashboard_url: /d/platform-operations
+      related_traces: service=performance
+      related_metrics: rate(go_gc_duration_seconds_sum[5m]) > 0.05

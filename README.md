@@ -133,6 +133,15 @@ Received events:
 
 See [`api/openapi.yaml`](api/openapi.yaml) for the full API specification.
 
+## Documentation & Operations
+
+RTMDS maintains comprehensive production documentation:
+- **[Onboarding Guide](docs/onboarding/ONBOARDING_GUIDE.md):** Repository tour and architecture reading order.
+- **[Operations Manual](docs/operations/OPERATIONS_MANUAL.md):** Routine maintenance, scaling, and startup/shutdown procedures.
+- **[Security Guide](docs/security/SECURITY_GUIDE.md):** Authentication, entitlements, and secret management.
+- **[Contributing Guide](CONTRIBUTING.md):** PR workflow and contribution guidelines.
+- **[Sequence Diagrams](docs/diagrams/SEQUENCE_DIAGRAMS.md):** Visual flow of pub/sub and replay workflows.
+
 ## Adding a Real Feed Provider
 
 1. Create `internal/marketdata/<provider>/feed.go`

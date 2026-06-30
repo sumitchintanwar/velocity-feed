@@ -1,0 +1,52 @@
+# ==============================================================================
+# Purpose: PodDisruptionBudgets for the production environment.
+# Architecture: Defines the minimum quorum of pods that must survive node drains.
+# Design Decisions: 
+# - Ensures zero downtime during automated AWS/GCP node pool upgrades.
+# ==============================================================================
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rtmds-gateway-pdb
+  namespace: rtmds
+spec:
+  minAvailable: 66%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: gateway
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rtmds-publisher-pdb
+  namespace: rtmds
+spec:
+  minAvailable: 66%
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: publisher
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rtmds-replay-api-pdb
+  namespace: rtmds
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: replay-api
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: rtmds-snapshot-service-pdb
+  namespace: rtmds
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: snapshot-service

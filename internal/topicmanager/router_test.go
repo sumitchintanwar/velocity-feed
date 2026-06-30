@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/clientqueue"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 )
 
@@ -52,14 +52,14 @@ func newTestTM(t *testing.T) Manager {
 	queueCfg := clientqueue.DefaultConfig()
 	queueCfg.QueueSize = 64
 	queueCfg.MaxAge = 100 * time.Millisecond
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	return NewWithQueue(0, &queueCfg, log, nil, nil)
 }
 
 func TestDistributedRouter_SubscribeFirstClientTriggersRedis(t *testing.T) {
 	tm := newTestTM(t)
 	mock := &mockRedisSub{}
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test",
 		WithSubscriptionChangeCallback(func(symbol string, change SubscriptionChange) {
@@ -97,7 +97,7 @@ func TestDistributedRouter_SubscribeFirstClientTriggersRedis(t *testing.T) {
 func TestDistributedRouter_LastUnsubscribeTriggersRedisUnsubscribe(t *testing.T) {
 	tm := newTestTM(t)
 	mock := &mockRedisSub{}
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test",
 		WithSubscriptionChangeCallback(func(symbol string, change SubscriptionChange) {
@@ -135,7 +135,7 @@ func TestDistributedRouter_LastUnsubscribeTriggersRedisUnsubscribe(t *testing.T)
 func TestDistributedRouter_MultipleSymbols(t *testing.T) {
 	tm := newTestTM(t)
 	mock := &mockRedisSub{}
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test",
 		WithSubscriptionChangeCallback(func(symbol string, change SubscriptionChange) {
@@ -165,7 +165,7 @@ func TestDistributedRouter_MultipleSymbols(t *testing.T) {
 
 func TestDistributedRouter_PublishRoutesLocally(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	h := router.Subscribe("client-1", "AAPL")
@@ -186,7 +186,7 @@ func TestDistributedRouter_PublishRoutesLocally(t *testing.T) {
 
 func TestDistributedRouter_NeedsSymbol(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	if router.NeedsSymbol("AAPL") {
@@ -208,7 +208,7 @@ func TestDistributedRouter_NeedsSymbol(t *testing.T) {
 
 func TestDistributedRouter_SubscriberCount(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	if router.SubscriberCount("AAPL") != 0 {
@@ -233,7 +233,7 @@ func TestDistributedRouter_SubscriberCount(t *testing.T) {
 
 func TestDistributedRouter_Subscribers(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	router.Subscribe("client-1", "AAPL", "MSFT")
@@ -257,7 +257,7 @@ func TestDistributedRouter_Subscribers(t *testing.T) {
 
 func TestDistributedRouter_EventsRouted(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	if router.EventsRouted() != 0 {
@@ -280,7 +280,7 @@ func TestDistributedRouter_EventsRouted(t *testing.T) {
 func TestDistributedRouter_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 	tm := newTestTM(t)
 	mock := &mockRedisSub{}
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test",
 		WithSubscriptionChangeCallback(func(symbol string, change SubscriptionChange) {
@@ -315,7 +315,7 @@ func TestDistributedRouter_ConcurrentSubscribeUnsubscribe(t *testing.T) {
 
 func TestDistributedRouter_ShardsReduceContention(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	// Subscribe to many symbols — each should land on different shards.
@@ -348,7 +348,7 @@ func TestDistributedRouter_ShardsReduceContention(t *testing.T) {
 func TestDistributedRouter_Reconcile(t *testing.T) {
 	tm := newTestTM(t)
 	mock := &mockRedisSub{}
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test",
 		WithSubscriptionChangeCallback(func(symbol string, change SubscriptionChange) {
@@ -377,7 +377,7 @@ func TestDistributedRouter_Reconcile(t *testing.T) {
 
 func TestDistributedRouter_SymbolToRedisChannel(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	// Known symbol → group channel.
@@ -424,7 +424,7 @@ func TestTopicGroups(t *testing.T) {
 
 func TestDistributedRouter_TopicCount(t *testing.T) {
 	tm := newTestTM(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	router := NewDistributedRouter(tm, "market:", log, "gateway-test")
 
 	if router.TopicCount() != 0 {

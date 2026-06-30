@@ -10,7 +10,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 )
 
@@ -76,7 +76,7 @@ type symbolState struct {
 type DistributedRouter struct {
 	local     Manager  // local topic manager for fan-out
 	prefix    string   // Redis channel prefix (default "market:")
-	log       zerolog.Logger
+	log       *log.Logger
 	gatewayID string
 
 	// Sharded per-symbol local subscriber tracking.
@@ -122,12 +122,12 @@ func routerHash(s string) uint64 {
 
 // NewDistributedRouter creates a router that wraps the local TopicManager
 // with dynamic Redis subscription management.
-func NewDistributedRouter(local Manager, prefix string, log zerolog.Logger, gatewayID string, opts ...RouterOption) *DistributedRouter {
+func NewDistributedRouter(local Manager, prefix string, l *log.Logger, gatewayID string, opts ...RouterOption) *DistributedRouter {
 	n := defaultRouterShards
 	r := &DistributedRouter{
 		local:      local,
 		prefix:     prefix,
-		log:        log,
+		log:        l,
 		gatewayID:  gatewayID,
 		shards:     make([]symbolShard, n),
 		shardMask:  uint64(n - 1),
@@ -189,7 +189,8 @@ func (r *DistributedRouter) Subscribe(id ID, topics ...Topic) Handle {
 			st.redisSub.Store(true)
 			shard.count++
 			r.activeRedisSubs.Add(1)
-			r.log.Info().Str("symbol", topic).Str("gateway", r.gatewayID).
+			r.log.Underlying().Info().Str("symbol", topic).Str("gateway", r.gatewayID).
+				Str("event", "redis_subscribe_requested").
 				Msg("distributed: first local subscriber → subscribing to Redis")
 			toSubscribe = append(toSubscribe, topic)
 		}
@@ -315,8 +316,9 @@ func (r *DistributedRouter) Unsubscribe(id ID) {
 				st.redisSub.Store(false)
 				shard.count--
 				r.activeRedisSubs.Add(-1)
-				r.log.Info().Str("symbol", topic).Str("gateway", r.gatewayID).
-					Msg("distributed: last subscriber left → unsubscribing from Redis")
+			r.log.Underlying().Info().Str("symbol", topic).Str("gateway", r.gatewayID).
+				Str("event", "redis_unsubscribe_requested").
+				Msg("distributed: last subscriber left → unsubscribing from Redis")
 				toUnsubscribe = append(toUnsubscribe, topic)
 			}
 			shard.mu.Unlock()
@@ -377,8 +379,9 @@ func (r *DistributedRouter) Reconcile() {
 				st.redisSub.Store(true)
 				shard.count++
 				r.activeRedisSubs.Add(1)
-				r.log.Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
-					Msg("distributed: reconciliation — re-subscribing to Redis")
+			r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
+				Str("event", "reconcile_resubscribe").
+				Msg("distributed: reconciliation — re-subscribing to Redis")
 				shard.mu.Unlock()
 				r.fireOnChange(sym, SubscribeRequested)
 				shard.mu.Lock()
@@ -388,8 +391,9 @@ func (r *DistributedRouter) Reconcile() {
 				st.redisSub.Store(false)
 				shard.count--
 				r.activeRedisSubs.Add(-1)
-				r.log.Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
-					Msg("distributed: reconciliation — re-unsubscribing from Redis")
+			r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
+				Str("event", "reconcile_unsubscribe").
+				Msg("distributed: reconciliation — re-unsubscribing from Redis")
 				shard.mu.Unlock()
 				r.fireOnChange(sym, UnsubscribeRequested)
 				shard.mu.Lock()

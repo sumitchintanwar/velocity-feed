@@ -1,0 +1,564 @@
+{
+  "annotations": { "list": [] },
+  "description": "Measure service reliability: dropped messages, replay activity, recovery behavior, and error rates. Answers: Are clients recovering? Are messages lost?",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [
+    { "title": "Executive Overview", "url": "/d/executive-overview", "type": "link" },
+    { "title": "Gateway Performance", "url": "/d/gateway-perf", "type": "link" }
+  ],
+  "panels": [
+    {
+      "title": "Dropped Messages (5m)",
+      "description": "Events dropped in the last 5 minutes. Any non-zero value means data loss. Sustained drops indicate slow consumers or capacity issues.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 0, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_distribution_events_dropped_total[5m]))",
+          "legendFormat": "dropped",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Replay Requests (5m)",
+      "description": "Replay requests in the last 5 minutes. Spikes indicate client recovery events — reconnect storms after gateway restarts or network partitions.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 10 },
+              { "color": "red", "value": 100 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 6, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_http_requests_total{route=\"/replay\"}[5m]))",
+          "legendFormat": "replays",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Write Errors (5m)",
+      "description": "WebSocket write errors in the last 5 minutes. Non-zero indicates client disconnects during write or socket buffer exhaustion.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 12, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_websocket_write_errors_total[5m]))",
+          "legendFormat": "errors",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Heartbeat Timeouts (5m)",
+      "description": "Clients disconnected due to heartbeat timeout. Spikes indicate network issues or client crashes.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 5 },
+              { "color": "red", "value": 20 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 6, "x": 18, "y": 0 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_websocket_heartbeat_timeouts_total[5m]))",
+          "legendFormat": "timeouts",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Dropped Messages Over Time",
+      "description": "Events dropped over time, broken down by source (distribution vs backpressure). Helps identify which layer is under pressure.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_distribution_events_dropped_total[5m]))",
+          "legendFormat": "distribution",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(rtmds_backpressure_events_dropped_total[5m]))",
+          "legendFormat": "backpressure",
+          "refId": "B"
+        },
+        {
+          "expr": "sum(rate(rtmds_worker_tasks_dropped_total[5m]))",
+          "legendFormat": "worker pool",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Replay Requests Over Time",
+      "description": "Replay request rate. Sudden spikes indicate client reconnect storms. Persistent elevated levels indicate ongoing instability.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 20,
+            "showPoints": "never"
+          },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 4 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_http_requests_total{route=\"/replay\"}[5m]))",
+          "legendFormat": "replay req/s",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Replay Latency P50 / P95 / P99",
+      "description": "Replay request duration. High latency means clients wait longer to recover after disconnection. P99 > 5s indicates DB bottleneck.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 12 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rtmds_http_request_duration_seconds_bucket{route=\"/replay\"}[5m]))",
+          "legendFormat": "P50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rtmds_http_request_duration_seconds_bucket{route=\"/replay\"}[5m]))",
+          "legendFormat": "P95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(rtmds_http_request_duration_seconds_bucket{route=\"/replay\"}[5m]))",
+          "legendFormat": "P99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Replay Latency Heatmap",
+      "description": "Distribution of replay request durations. Shows the density of latency values — darker regions indicate where most requests land.",
+      "type": "heatmap",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "options": {
+        "calculate": false,
+        "yAxis": {
+          "unit": "s",
+          "decimals": 1
+        },
+        "color": {
+          "mode": "scheme",
+          "scheme": "Blues",
+          "fill": "dark"
+        },
+        "cellGap": 1
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "scaleDistribution": { "type": "log", "log": 2 }
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_http_request_duration_seconds_bucket{route=\"/replay\"}[5m])) by (le)",
+          "legendFormat": "{{ le }}",
+          "refId": "A",
+          "format": "heatmap"
+        }
+      ]
+    },
+    {
+      "title": "Connection Churn",
+      "description": "Connection opens minus closes per 5-minute window. Positive = net growth, negative = net loss. Large negative values indicate instability.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 12 },
+      "targets": [
+        {
+          "expr": "sum(rate(rtmds_websocket_connections_opened_total[5m])) * 300 - sum(rate(rtmds_websocket_connections_closed_total[5m])) * 300",
+          "legendFormat": "net connections/5m",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Backpressure Buffer Occupancy",
+      "description": "How full are the backpressure buffers? > 80% means events are being dropped. Shows the distribution across all buffers.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 1,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "percentunit",
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 0.6 },
+              { "color": "red", "value": 0.8 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 20 },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, rate(rtmds_backpressure_buffer_occupancy_ratio_bucket[5m]))",
+          "legendFormat": "P50 occupancy",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, rate(rtmds_backpressure_buffer_occupancy_ratio_bucket[5m]))",
+          "legendFormat": "P95 occupancy",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, rate(rtmds_backpressure_buffer_occupancy_ratio_bucket[5m]))",
+          "legendFormat": "P99 occupancy",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Consumer Disconnects",
+      "description": "Clients disconnected due to backpressure. Non-zero means clients are being forcibly removed for being too slow.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "fillOpacity": 50,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 20 },
+      "targets": [
+        {
+          "expr": "sum(increase(rtmds_backpressure_consumer_disconnects_total[5m]))",
+          "legendFormat": "disconnects/5m",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PostgreSQL Status",
+      "description": "PostgreSQL reachability via postgres_exporter. 1 = up, 0 = down. If this drops to 0, replay API fails and clients cannot recover.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "mappings": [
+            { "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } }, "type": "value" }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          }
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 0, "y": 26 },
+      "targets": [
+        {
+          "expr": "up{job=\"postgres\"}",
+          "legendFormat": "status",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Active Connections",
+      "description": "Current PostgreSQL connections. High connection count may indicate pool exhaustion or connection leak.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 90 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 4, "y": 26 },
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count",
+          "legendFormat": "active",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Transactions/sec",
+      "description": "PostgreSQL transaction rate. A drop to zero during replay traffic indicates DB failure.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "green", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 8, "y": 26 },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_xact_commit_total[5m]) + rate(pg_stat_database_xact_rollback_total[5m])",
+          "legendFormat": "txns/sec",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Deadlocks",
+      "description": "PostgreSQL deadlocks detected. Non-zero indicates contention in the event log writes.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "red", "value": 1 }
+            ]
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 12, "y": 26 },
+      "targets": [
+        {
+          "expr": "increase(pg_stat_database_deadlocks_total[5m])",
+          "legendFormat": "deadlocks/5m",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Cache Hit Ratio",
+      "description": "Fraction of disk reads avoided by shared buffer cache. < 99% indicates memory pressure or undersized shared_buffers.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 0.95 },
+              { "color": "green", "value": 0.99 }
+            ]
+          },
+          "unit": "percentunit"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 16, "y": 26 },
+      "targets": [
+        {
+          "expr": "pg_stat_database_blks_hit_total / (pg_stat_database_blks_hit_total + pg_stat_database_blks_read_total)",
+          "legendFormat": "hit ratio",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Replication Lag",
+      "description": "PostgreSQL replication lag (seconds). 0 for single-instance setups. Non-zero indicates replica divergence.",
+      "type": "stat",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 1 },
+              { "color": "red", "value": 10 }
+            ]
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 4, "w": 4, "x": 20, "y": 26 },
+      "targets": [
+        {
+          "expr": "pg_stat_replication_lag_seconds",
+          "legendFormat": "lag",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Connection Pool",
+      "description": "PostgreSQL connections over time. Shows active, idle, and waiting connections. Growing idle count indicates connection leak.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 15,
+            "showPoints": "never"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 0, "y": 30 },
+      "targets": [
+        {
+          "expr": "pg_stat_activity_count",
+          "legendFormat": "total connections",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "PG Transaction Duration",
+      "description": "PostgreSQL transaction duration. High P99 indicates slow queries blocking replay and snapshot operations.",
+      "type": "timeseries",
+      "datasource": { "type": "prometheus", "uid": "PBFA97CFB590B2093" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "fillOpacity": 10,
+            "showPoints": "never"
+          },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 6, "w": 12, "x": 12, "y": 30 },
+      "targets": [
+        {
+          "expr": "rate(pg_stat_database_xact_commit_total[5m])",
+          "legendFormat": "commit rate",
+          "refId": "A"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["rtmds", "reliability", "sre"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "utc",
+  "title": "RTMDS Reliability Metrics",
+  "uid": "reliability",
+  "version": 1
+}

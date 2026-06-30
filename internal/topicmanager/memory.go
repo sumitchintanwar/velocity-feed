@@ -10,6 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/clientqueue"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 )
@@ -28,11 +29,9 @@ type subList struct {
 
 // shard protects the topics map for a disjoint subset of topics.
 // Uses sync.Map for lock-free reads on the publish hot path (Alt A1).
-// mu serializes writers (Subscribe/Unsubscribe) to prevent races in the
-// read-modify-write cycle of the RCU pattern.
+// Updates are handled via lock-free CompareAndSwap on atomic.Pointer.
 type shard struct {
 	topics sync.Map // map[Topic]*atomic.Pointer[subList]
-	mu     sync.Mutex // serializes writers (Subscribe/Unsubscribe)
 }
 
 // subscriber tracks one client's delivery queue and topic membership.
@@ -59,7 +58,7 @@ type subscriber struct {
 // subShard protects a subset of subscribers for a disjoint subset of subscriber IDs.
 // This reduces contention on the global subscriber registry during market-open storms.
 type subShard struct {
-	mu   sync.Mutex
+	mu   sync.RWMutex
 	subs map[ID]*subscriber
 }
 
@@ -76,7 +75,7 @@ type MemoryManager struct {
 	// queueCfg enables per-subscriber clientqueue integration.
 	// When nil, legacy raw-channel mode is used.
 	queueCfg *clientqueue.Config
-	log      zerolog.Logger
+	log      *log.Logger
 	reg      prometheus.Registerer
 
 	// appMetrics is optional application-level metrics. When non-nil,
@@ -115,14 +114,14 @@ func New(shards int) *MemoryManager {
 // The appMetrics parameter is optional: when non-nil, the manager increments
 // the application-level Prometheus instruments (broadcasts, drops, subscribers,
 // subscription events).
-func NewWithQueue(shards int, queueCfg *clientqueue.Config, log zerolog.Logger, reg prometheus.Registerer, appMetrics *platform.Metrics) *MemoryManager {
+func NewWithQueue(shards int, queueCfg *clientqueue.Config, l *log.Logger, reg prometheus.Registerer, appMetrics *platform.Metrics) *MemoryManager {
 	tm := New(shards)
 	if queueCfg == nil {
 		defaults := clientqueue.DefaultConfig()
 		queueCfg = &defaults
 	}
 	tm.queueCfg = queueCfg
-	tm.log = log
+	tm.log = l
 	tm.reg = reg
 	tm.appMetrics = appMetrics
 
@@ -175,29 +174,49 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 
 	si := tm.hashSubscriber(id)
 	ss := &tm.subShards[si]
-	ss.mu.Lock()
+
+	// Fast path: check if subscriber exists using RLock
+	ss.mu.RLock()
 	sub, exists := ss.subs[id]
+	ss.mu.RUnlock()
+
+	var newQueue *clientqueue.CachedQueue
 	if !exists {
-		sub = &subscriber{
-			done:   make(chan struct{}),
-			topics: make(map[Topic]struct{}, len(topics)),
-		}
-		// Per-subscriber backpressure queue (CachedEvent mode).
+		// Prepare new subscriber outside the lock to minimize critical section
 		if tm.queueCfg != nil {
 			cfg := *tm.queueCfg
-			log := tm.log
-			if log.GetLevel() == zerolog.Disabled {
-				log = zerolog.Nop()
+			zl := tm.log.Underlying()
+			queueLog := *zl
+			if zl.GetLevel() == zerolog.Disabled {
+				queueLog = zerolog.Nop()
 			}
-			sub.queue = clientqueue.NewCachedQueue(id, cfg, log, tm.reg, func(reason string) {
+			newQueue = clientqueue.NewCachedQueue(id, cfg, queueLog, tm.reg, func(reason string) {
 				tm.Unsubscribe(id)
 			})
-		} else {
-			sub.ch = make(chan *marketdata.CachedEvent, defaultBuffer)
 		}
-		ss.subs[id] = sub
+
+		// Double-checked locking for insertion
+		ss.mu.Lock()
+		sub, exists = ss.subs[id]
+		if !exists {
+			sub = &subscriber{
+				done:   make(chan struct{}),
+				topics: make(map[Topic]struct{}, len(topics)),
+			}
+			if newQueue != nil {
+				sub.queue = newQueue
+			} else {
+				sub.ch = make(chan *marketdata.CachedEvent, defaultBuffer)
+			}
+			ss.subs[id] = sub
+		} else {
+			// Lost the race, clean up the unused queue
+			if newQueue != nil {
+				newQueue.Close()
+			}
+		}
+		ss.mu.Unlock()
 	}
-	ss.mu.Unlock()
 
 	for _, t := range topics {
 		if _, ok := sub.topics[t]; ok {
@@ -206,27 +225,35 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 		si := tm.hashTopic(t)
 		s := &tm.shards[si]
 
-		// Acquire shard mutex to serialize writers and prevent races.
-		s.mu.Lock()
-		// COW: load current list, create new list with sub appended, swap.
-		// sync.Map: Load is lock-free for established keys.
-		var oldSubs []*subscriber
-		if v, ok := s.topics.Load(t); ok {
+		// Lock-free RCU: load current list, create new list with sub appended, and CAS.
+		for {
+			v, ok := s.topics.Load(t)
+			if !ok {
+				ap := &atomic.Pointer[subList]{}
+				newSubs := []*subscriber{sub}
+				ap.Store(&subList{subs: newSubs})
+				_, loaded := s.topics.LoadOrStore(t, ap)
+				if loaded {
+					// Another goroutine created it first, retry loop
+					continue
+				}
+				break
+			}
 			ap := v.(*atomic.Pointer[subList])
-			if old := ap.Load(); old != nil {
-				oldSubs = old.subs
+			oldList := ap.Load()
+			var oldSubs []*subscriber
+			if oldList != nil {
+				oldSubs = oldList.subs
 			}
 			newSubs := make([]*subscriber, 0, len(oldSubs)+1)
 			newSubs = append(newSubs, oldSubs...)
 			newSubs = append(newSubs, sub)
-			ap.Store(&subList{subs: newSubs})
-		} else {
-			ap := &atomic.Pointer[subList]{}
-			newSubs := []*subscriber{sub}
-			ap.Store(&subList{subs: newSubs})
-			s.topics.Store(t, ap)
+			
+			// CompareAndSwap ensures we only commit if the list hasn't changed
+			if ap.CompareAndSwap(oldList, &subList{subs: newSubs}) {
+				break
+			}
 		}
-		s.mu.Unlock()
 
 		sub.topics[t] = struct{}{}
 	}
@@ -264,31 +291,35 @@ func (tm *MemoryManager) Unsubscribe(id ID) {
 		si := tm.hashTopic(t)
 		s := &tm.shards[si]
 
-		// Acquire shard mutex to serialize writers and prevent races.
-		s.mu.Lock()
-		v, ok := s.topics.Load(t)
-		if !ok {
-			s.mu.Unlock()
-			continue
-		}
-		ap := v.(*atomic.Pointer[subList])
-		old := ap.Load()
-		var oldSubs []*subscriber
-		if old != nil {
-			oldSubs = old.subs
-		}
-		newSubs := make([]*subscriber, 0, len(oldSubs))
-		for _, s := range oldSubs {
-			if s != sub {
-				newSubs = append(newSubs, s)
+		// Lock-free RCU: load current list, create new list omitting sub, and CAS.
+		for {
+			v, ok := s.topics.Load(t)
+			if !ok {
+				break
+			}
+			ap := v.(*atomic.Pointer[subList])
+			oldList := ap.Load()
+			var oldSubs []*subscriber
+			if oldList != nil {
+				oldSubs = oldList.subs
+			}
+			newSubs := make([]*subscriber, 0, len(oldSubs))
+			for _, s := range oldSubs {
+				if s != sub {
+					newSubs = append(newSubs, s)
+				}
+			}
+			if len(newSubs) == 0 {
+				if ap.CompareAndSwap(oldList, nil) {
+					s.topics.Delete(t)
+					break
+				}
+			} else {
+				if ap.CompareAndSwap(oldList, &subList{subs: newSubs}) {
+					break
+				}
 			}
 		}
-		if len(newSubs) == 0 {
-			s.topics.Delete(t)
-		} else {
-			ap.Store(&subList{subs: newSubs})
-		}
-		s.mu.Unlock()
 	}
 
 	// Signal done. The event channel is NOT closed — this avoids the

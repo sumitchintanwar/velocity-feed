@@ -1,0 +1,363 @@
+# ══════════════════════════════════════════════════════════════════════════════
+# RTMDS Prometheus Alert Rules
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# Alert hierarchy:
+#
+#   ThroughputDrop ──────────┐
+#   DroppedMessagesSustained ┤
+#   FeedErrorsHigh ──────────┤──→ PlatformDegraded (PAGE)
+#   ReplaySpike ─────────────┤
+#   WSDropSudden ────────────┘
+#
+#   RedisDown ───────────────┐
+#   RedisHighLatency ────────┤──→ RedisDegraded (PAGE)
+#   RedisMemoryHigh ─────────┘
+#
+#   PublishLatencyP99High ───┐
+#   WSLatencyP99High ────────┤──→ LatencyCritical (PAGE)
+#   ReplayLatencyP99High ────┘
+#
+#   GatewayRestartCount ──────── GatewayUnstable (TICKET)
+#   SlowConsumersHigh ────────── SlowConsumerStorm (TICKET)
+#   ConnectionSaturationHigh ─── CapacityWarning (TICKET)
+
+groups:
+  # ── Throughput & Data Flow ──────────────────────────────────────────────────
+  - name: throughput
+    rules:
+      # P0: Messages/Sec Drops Unexpectedly
+      # ─────────────────────────────────────
+      # Operational value: Detects feed failure, Redis failure, or publisher
+      # failure within 60 seconds. At 100k msgs/sec, a drop to 0 means the
+      # entire data pipeline is broken.
+      #
+      # How it works: compares the 5-minute rate to the 1-hour baseline.
+      # If the current rate is less than 50% of the hourly average, the
+      # alert fires. This adapts to normal traffic patterns (e.g., lower
+      # volume on weekends).
+      #
+      # Overhead: zero — purely PromQL, no new instrumentation.
+      - alert: ThroughputDrop
+        expr: |
+          (
+            rate(rtmds_feed_messages_received_total[5m])
+            /
+            rate(rtmds_feed_messages_received_total[1h])
+          ) < 0.5
+          and
+          rate(rtmds_feed_messages_received_total[1h]) > 10
+        for: 2m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "Throughput dropped >50% from hourly baseline"
+          description: >
+            Current 5m rate is less than 50% of the 1h average.
+            Possible causes: feed failure, Redis failure, publisher crash.
+            Check: Redis Dashboard → Gateway Dashboard → Logs.
+          runbook_url: "https://github.com/sumit/rtmds/wiki/runbooks/throughput-drop"
+
+      # P1: Sustained Dropped Messages
+      # ──────────────────────────────
+      # Operational value: Dropped messages mean data loss for clients.
+      # Even 1 drop/sec for 5 minutes = 300 lost events. This alert uses
+      # a burn rate to avoid false positives from transient spikes.
+      #
+      # How it works: compares the 5m drop rate to the 1h baseline.
+      # If drops are increasing (5m rate > 2x the 1h average), the alert
+      # fires. This means drops are getting worse, not just a one-off blip.
+      #
+      # Overhead: zero — uses existing events_dropped_total counter.
+      - alert: DroppedMessagesSustained
+        expr: |
+          (
+            increase(rtmds_distribution_events_dropped_total[5m])
+            /
+            clamp_min(increase(rtmds_distribution_events_dropped_total[1h]) / 12, 1)
+          ) > 2
+          and
+          increase(rtmds_distribution_events_dropped_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Drop rate accelerating: {{ $value | printf \"%.1f\" }}x baseline"
+          description: >
+            {{ $value | printf "%.0f" }} events dropped in the last 5 minutes.
+            The drop rate is accelerating (> 2x the hourly average).
+            Check slow consumers and backpressure buffer occupancy.
+            Use the Reliability Dashboard for drill-down.
+
+      # P2: Feed Error Rate High
+      # ────────────────────────
+      # Operational value: Feed errors indicate upstream data quality issues.
+      # 10+ errors in 5 minutes may mean the feed provider is degraded.
+      #
+      # How it works: counts feed errors per provider over 5 minutes.
+      # Threshold of 10 is chosen because occasional errors are normal
+      # (network blips), but 10+ indicates a pattern.
+      #
+      # Overhead: zero — uses existing feed_errors_total counter.
+      - alert: FeedErrorsHigh
+        expr: |
+          increase(rtmds_feed_errors_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Feed errors elevated: {{ $labels.provider }}"
+          description: >
+            {{ $value | printf "%.0f" }} errors from provider {{ $labels.provider }}
+            in the last 5 minutes. Check feed provider status and network.
+
+  # ── Latency ─────────────────────────────────────────────────────────────────
+  - name: latency
+    rules:
+      # P0: P99 Publish Latency High
+      # ────────────────────────────
+      # Operational value: P99 publish latency > 100ms means 1% of publishes
+      # take > 100ms. At 100k msgs/sec, that's 1,000 messages/sec experiencing
+      # high latency — enough to cause client-visible delays.
+      #
+      # How it works: computes the 99th percentile of the publish duration
+      # histogram over a 5-minute window. The histogram buckets in the code
+      # (0.1ms to 10s) provide sufficient resolution.
+      #
+      # Overhead: zero — uses existing prometheus histogram.
+      - alert: PublishLatencyP99High
+        expr: |
+          histogram_quantile(0.99,
+            rate(rtmds_http_request_duration_seconds_bucket[5m])
+          ) > 0.1
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "P99 publish latency > 100ms"
+          description: >
+            The 99th percentile publish latency is {{ $value | printf "%.3f" }}s.
+            This affects 1% of all messages. Check Redis latency and network.
+            Use the Redis Dashboard for drill-down.
+
+      # P1: P99 WebSocket Delivery Latency High
+      # ────────────────────────────────────────
+      # Operational value: High delivery latency means clients see stale data.
+      # For market data, 500ms latency can mean missed trading opportunities.
+      #
+      # How it works: computes P99 of the delivery latency histogram.
+      # Threshold of 500ms is chosen because sub-second latency is the
+      # SLA for market data delivery.
+      #
+      # Overhead: zero — uses existing delivery_latency_seconds histogram.
+      - alert: WSDeliveryLatencyP99High
+        expr: |
+          histogram_quantile(0.99,
+            rate(rtmds_websocket_delivery_latency_seconds_bucket[5m])
+          ) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "P99 WebSocket delivery latency > 500ms"
+          description: >
+            The 99th percentile delivery latency is {{ $value | printf "%.3f" }}s.
+            Clients may be seeing stale data. Check slow consumers and
+            backpressure buffer occupancy.
+
+  # ── Redis ───────────────────────────────────────────────────────────────────
+  - name: redis
+    rules:
+      # P0: Redis Down
+      # ──────────────
+      # Operational value: Redis is the message bus. If Redis is down,
+      # no events reach any gateway. All clients see stale data.
+      # This is a PAGE alert — immediate response required.
+      #
+      # How it works: Prometheus health check on the Redis target.
+      # If 3 consecutive scrapes fail (45 seconds), the alert fires.
+      #
+      # Overhead: zero — standard Prometheus up/down detection.
+      - alert: RedisDown
+        expr: up{job="redis"} == 0
+        for: 45s
+        labels:
+          severity: critical
+          team: infrastructure
+        annotations:
+          summary: "Redis is DOWN"
+          description: >
+            Redis has been unreachable for 45 seconds.
+            All gateway clients are seeing stale data.
+            Check: Redis container status, network, memory.
+
+      # P1: Redis Memory High
+      # ─────────────────────
+      # Operational value: Redis is configured with maxmemory 256mb.
+      # If memory approaches this limit, Redis may evict data or OOM.
+      # For Pub/Sub, high memory indicates too many subscriptions or
+      # large payloads.
+      #
+      # How it works: compares Redis used_memory to maxmemory.
+      # At 75%, the alert fires to give time for investigation before
+      # Redis starts evicting keys or rejecting writes.
+      #
+      # Overhead: zero — requires redis_exporter (standard).
+      - alert: RedisMemoryHigh
+        expr: |
+          redis_memory_used_bytes / redis_memory_max_bytes > 0.75
+        for: 10m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Redis memory usage > 75%"
+          description: >
+            Redis is using {{ $value | humanizePercentage }} of its configured
+            maxmemory. Current: {{ with printf "redis_memory_used_bytes" | query }}{{ . | first | value | humanize1024 }}B{{ end }}.
+            Check for subscription growth or large payloads.
+            At 80%, Redis may start evicting keys. Investigate immediately.
+
+      # P2: Redis Latency High
+      # ──────────────────────
+      # Operational value: Redis latency > 10ms means every publish and
+      # subscribe operation is delayed. At 100k msgs/sec, this creates
+      # a cascading backlog.
+      #
+      # How it works: monitors redis_commands_duration_seconds_total /
+      # redis_commands_processed_total for average command latency.
+      #
+      # Overhead: zero — requires redis_exporter.
+      - alert: RedisLatencyHigh
+        expr: |
+          rate(redis_commands_duration_seconds_total[5m])
+          /
+          rate(redis_commands_processed_total[5m])
+          > 0.01
+        for: 5m
+        labels:
+          severity: warning
+          team: infrastructure
+        annotations:
+          summary: "Redis average command latency > 10ms"
+          description: >
+            Redis command latency is {{ $value | printf "%.3f" }}s.
+            This directly impacts publish/subscribe throughput.
+
+  # ── WebSocket & Connections ─────────────────────────────────────────────────
+  - name: websocket
+    rules:
+      # P0: Sudden Connection Drop
+      # ──────────────────────────
+      # Operational value: A 20% drop in connections in 5 minutes means
+      # 20% of clients disconnected simultaneously. This indicates a
+      # gateway crash, load balancer failure, or network outage.
+      #
+      # How it works: compares the 5-minute rate of connections opened
+      # to connections closed. If closures outpace openings by 20%, the
+      # alert fires.
+      #
+      # Overhead: zero — uses existing connection counters.
+      - alert: WSDropSudden
+        expr: |
+          (
+            rate(rtmds_websocket_connections_closed_total[5m])
+            -
+            rate(rtmds_websocket_connections_opened_total[5m])
+          )
+          /
+          rate(rtmds_websocket_connections_opened_total[5m]) > 0.2
+          and
+          rate(rtmds_websocket_connections_opened_total[1h]) > 1
+        for: 5m
+        labels:
+          severity: critical
+          team: platform
+        annotations:
+          summary: "WebSocket connections dropped >20% in 5 minutes"
+          description: >
+            More connections are closing than opening. Possible gateway
+            failure, load balancer issue, or network outage.
+            Check: Gateway Dashboard → health checks → load balancer.
+
+      # P2: Slow Consumer Storm
+      # ──────────────────────
+      # Operational value: > 10 slow consumers simultaneously means
+      # the fan-out system is under pressure. Clients will be
+      # disconnected after maxConsecutiveDrops (100) missed messages.
+      #
+      # How it works: checks the slow_consumers gauge. If > 10 for
+      # 5 minutes, it indicates a systemic issue (not just one slow client).
+      #
+      # Overhead: zero — uses existing slow_consumers gauge.
+      - alert: SlowConsumersHigh
+        expr: rtmds_websocket_slow_consumers > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "{{ $value | printf \"%.0f\" }} slow consumers detected"
+          description: >
+            More than 10 clients are experiencing backpressure.
+            These clients will be disconnected after 100 consecutive drops.
+            Check network bandwidth and client processing capacity.
+
+  # ── Reliability & Recovery ──────────────────────────────────────────────────
+  - name: reliability
+    rules:
+      # P1: Replay Spike
+      # ────────────────
+      # Operational value: Replay requests indicate client recovery.
+      # A spike (> 10 req/s) means many clients are recovering from
+      # a disconnect — typically after a gateway restart or network
+      # partition. Correlating with process_start_time confirms the
+      # cause is a gateway restart, not a client-side issue.
+      #
+      # How it works: rates the replay request counter over 5 minutes.
+      # Threshold of 10 req/s is chosen because normal replay volume
+      # is near zero (only new connections request replays).
+      # The annotation includes process_start_time to confirm restart.
+      #
+      # Overhead: zero — uses existing http_requests_total with route=replay.
+      - alert: ReplaySpike
+        expr: |
+          sum(rate(rtmds_http_requests_total{route="/replay"}[5m])) > 10
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Replay requests elevated: {{ $value | printf \"%.1f\" }} req/s"
+          description: >
+            High replay volume indicates a client reconnect storm.
+            Check if gateway restarted: process_start_time_seconds changes.
+            Check: Gateway Dashboard → connection events → Redis availability.
+            Runbook: https://github.com/sumit/rtmds/wiki/runbooks/replay-spike
+
+      # P2: Gateway Restart Count
+      # ─────────────────────────
+      # Operational value: Unexpected gateway restarts indicate instability.
+      # 3+ restarts in 1 hour suggests a crash loop or bad deployment.
+      #
+      # How it works: uses the process_start_time_seconds metric.
+      # If it changes (process restarted), the alert fires.
+      #
+      # Overhead: zero — standard Go process metric.
+      - alert: GatewayRestartCount
+        expr: |
+          changes(process_start_time_seconds[1h]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          team: platform
+        annotations:
+          summary: "Gateway restarted {{ $value | printf \"%.0f\" }} times in 1 hour"
+          description: >
+            Frequent restarts indicate instability. Check logs for OOM kills,
+            panics, or configuration errors.

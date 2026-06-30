@@ -1,7 +1,7 @@
-# Development environment: Redis + Go dev container.
+# Development environment: Redis + PostgreSQL + Go dev container.
 #
 # Quick start:
-#   docker compose -f docker-compose.dev.yml up -d redis
+#   docker compose -f docker-compose.dev.yml up -d redis postgres
 #   docker compose -f docker-compose.dev.yml run --rm dev
 #
 # Inside the dev container:
@@ -22,6 +22,21 @@ services:
       timeout: 3s
       retries: 5
 
+  postgres:
+    image: postgres:16-alpine
+    container_name: rtmds-postgres-dev
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: rtmds
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d rtmds"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   dev:
     build:
       context: .
@@ -33,8 +48,22 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+      postgres:
+        condition: service_healthy
     environment:
       REDIS_ADDR: "redis:6379"
       RTMDS_REDIS_ADDR: "redis:6379"
+      RTMDS_DATABASE_ENABLED: "true"
+      RTMDS_DATABASE_HOST: "postgres"
+      RTMDS_DATABASE_PORT: "5432"
+      RTMDS_DATABASE_USER: "postgres"
+      RTMDS_DATABASE_PASSWORD: "postgres"
+      RTMDS_DATABASE_DBNAME: "rtmds"
+      RTMDS_DATABASE_SSLMODE: "disable"
+      POSTGRES_TEST_HOST: "postgres"
+      POSTGRES_TEST_PORT: "5432"
+      POSTGRES_TEST_USER: "postgres"
+      POSTGRES_TEST_PASSWORD: "postgres"
+      POSTGRES_TEST_DBNAME: "rtmds"
     stdin_open: true
     tty: true

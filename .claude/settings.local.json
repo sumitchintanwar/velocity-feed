@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go version *)",
+      "Bash(go build *)",
+      "Bash(./rtmds-server.exe)",
+      "Bash(curl -s -o /tmp/metrics.txt -w \"HTTP_CODE:%{http_code}\\\\n\" http://localhost:9090/metrics)",
+      "Bash(netstat -aaon)",
+      "Bash(curl -s -o /tmp/metrics8080.txt -w \"HTTP_CODE:%{http_code}\\\\n\" http://localhost:8080/metrics)",
+      "Bash(tasklist)",
+      "Bash(RTMDS_SERVER_PORT=9090 ./rtmds-server-test.exe)",
+      "Bash(curl -s -o /tmp/metrics9090.txt -w \"HTTP_CODE:%{http_code}\\\\n\" http://localhost:9090/metrics)",
+      "Read(//tmp/**)",
+      "Bash(curl -s http://localhost:9090/health)",
+      "Bash(curl -s http://localhost:9090/about)",
+      "Bash(curl -s http://localhost:9090/ready)",
+      "Bash(curl -s -o /tmp/metrics9090-2.txt -w \"HTTP_CODE:%{http_code}\\\\n\" http://localhost:9090/metrics)",
+      "Bash(curl -s -o /tmp/metrics9090-3.txt -w \"HTTP_CODE:%{http_code}\\\\n\" http://localhost:9090/metrics)"
+    ]
+  }
+}

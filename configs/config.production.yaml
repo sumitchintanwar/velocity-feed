@@ -1,0 +1,61 @@
+# ─── Production Configuration ─────────────────────────────────────────────────
+# Usage: Mounted via Kubernetes ConfigMap or set via environment variables.
+#
+# All secrets (database password, redis password) MUST come from environment
+# variables or Kubernetes Secrets. Never commit secrets to this file.
+#
+# This file defines non-sensitive production defaults. Environment variables
+# override these values for each deployment.
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "10s"
+  write_timeout: "10s"
+  shutdown_timeout: "15s"
+
+redis:
+  enabled: true
+  addr: "redis-headless.rtmds.svc.cluster.local:6379"
+  # password: ""  # RTMDS_REDIS_PASSWORD from Kubernetes Secret
+
+feed:
+  enabled: true
+  symbols: ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NVDA", "JPM"]
+  reconnect_delay: "5s"
+  benchmark_mode: false
+
+log:
+  level: "info"
+  format: "json"
+
+metrics:
+  enabled: true
+  path: "/metrics"
+
+database:
+  enabled: true
+  host: "postgres-primary.rtmds.svc.cluster.local"
+  port: 5432
+  user: "rtmds_app"
+  # password: ""  # RTMDS_DATABASE_PASSWORD from Kubernetes Secret
+  dbname: "rtmds"
+  sslmode: "require"
+  max_open_conns: 25
+  max_idle_conns: 10
+  max_lifetime: "5m"
+
+snapshot:
+  enabled: true
+  checkpoint_path: "/data/snapshot.json"
+  checkpoint_interval: "30s"
+  max_age: "24h"
+
+discovery:
+  enabled: true
+  ttl: "30s"
+  heartbeat_interval: "10s"
+
+tracing:
+  enabled: true
+  endpoint: "otel-collector.observability.svc.cluster.local:4318"
+  sample_ratio: 0.01

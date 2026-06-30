@@ -42,7 +42,10 @@ func (c *client) connect(ctx context.Context) error {
 		HandshakeTimeout: 10 * time.Second,
 	}
 
-	conn, _, err := dialer.DialContext(ctx, c.cfg.ServerURL, nil)
+	dialCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+	defer cancel()
+
+	conn, _, err := dialer.DialContext(dialCtx, c.cfg.ServerURL, nil)
 	if err != nil {
 		return fmt.Errorf("client %d: dial: %w", c.id, err)
 	}
@@ -122,6 +125,7 @@ func (c *client) close() {
 		c.cancel()
 	}
 	if c.conn != nil {
+		c.conn.SetWriteDeadline(time.Now().Add(1 * time.Second))
 		// Send close message.
 		c.conn.WriteMessage(websocket.CloseMessage,
 			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))

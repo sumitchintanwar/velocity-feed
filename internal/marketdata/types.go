@@ -19,6 +19,7 @@ const (
 type Quote struct {
 	Symbol    string    `json:"symbol"`
 	Type      QuoteType `json:"type"`
+	Seq       int64     `json:"seq"`               // Per-symbol sequence number for ordering guarantees.
 	Price     float64   `json:"price"`
 	Bid       float64   `json:"bid,omitempty"`
 	Ask       float64   `json:"ask,omitempty"`
@@ -26,6 +27,8 @@ type Quote struct {
 	Timestamp time.Time `json:"timestamp"`
 	// Provider is the feed source identifier (e.g. "alpaca", "polygon").
 	Provider string `json:"provider,omitempty"`
+	// Extensions holds arbitrary exchange-specific metadata.
+	Extensions map[string]any `json:"extensions,omitempty"`
 }
 
 // EventSymbol implements MarketEvent.
@@ -33,6 +36,9 @@ func (q Quote) EventSymbol() string { return q.Symbol }
 
 // EventType implements MarketEvent.
 func (q Quote) EventType() string { return string(q.Type) }
+
+// GetSeq returns the sequence number.
+func (q Quote) GetSeq() int64 { return q.Seq }
 
 // GetTimestamp returns the quote timestamp for max-age filtering.
 func (q Quote) GetTimestamp() time.Time { return q.Timestamp }
@@ -47,6 +53,8 @@ type Bar struct {
 	Volume    int64     `json:"volume"`
 	Timestamp time.Time `json:"timestamp"`
 	Provider  string    `json:"provider,omitempty"`
+	// Extensions holds arbitrary exchange-specific metadata.
+	Extensions map[string]any `json:"extensions,omitempty"`
 }
 
 // EventSymbol implements MarketEvent.

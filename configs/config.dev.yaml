@@ -1,0 +1,56 @@
+# ─── Local Development Configuration ─────────────────────────────────────────
+# Usage: ./rtmds -config configs/config.dev.yaml
+#
+# Inherits all built-in defaults. Override only what differs for local dev.
+# Secrets (database password) should come from .env file or environment variables.
+server:
+  host: "127.0.0.1"
+  port: 9090
+  read_timeout: "10s"
+  write_timeout: "10s"
+  shutdown_timeout: "15s"
+
+redis:
+  enabled: true
+  addr: "localhost:6379"
+  # password: ""  # Set via RTMDS_REDIS_PASSWORD env var or .env file
+
+feed:
+  enabled: true
+  symbols: ["AAPL", "MSFT", "GOOG", "AMZN", "TSLA"]
+  reconnect_delay: "5s"
+  benchmark_mode: false
+
+log:
+  level: "debug"    # Verbose logging for local development
+  format: "text"    # Human-readable text format
+
+metrics:
+  enabled: true
+  path: "/metrics"
+
+database:
+  enabled: true
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  # password: ""  # Set via RTMDS_DATABASE_PASSWORD env var
+  dbname: "rtmds"
+  sslmode: "disable"
+  max_open_conns: 5
+  max_idle_conns: 2
+  max_lifetime: "5m"
+
+snapshot:
+  enabled: true
+  checkpoint_path: "data/snapshot.json"
+  checkpoint_interval: "30s"
+  max_age: "24h"
+
+discovery:
+  enabled: false  # Single instance, no discovery needed
+
+tracing:
+  enabled: false
+  endpoint: "localhost:4318"
+  sample_ratio: 0.01

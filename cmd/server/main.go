@@ -23,11 +23,18 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
 	"github.com/sumit/rtmds/internal/app"
 	"github.com/sumit/rtmds/internal/config"
+
+	// Register exchange adapters
+	_ "github.com/sumit/rtmds/internal/adapters/crypto"
+	_ "github.com/sumit/rtmds/internal/adapters/nasdaq"
+	_ "github.com/sumit/rtmds/internal/adapters/nyse"
+	_ "github.com/sumit/rtmds/internal/adapters/simulator"
 )
 
 func main() {
@@ -41,6 +48,12 @@ func main() {
 		// Use plain stderr here — logger isn't set up yet.
 		_, _ = os.Stderr.WriteString(fmt.Sprintf("config error: %v\n", err))
 		os.Exit(1)
+	}
+
+	// ── 2.5 Configure Runtime Profiling ─────────────────────────
+	if cfg.Profiling.Enabled {
+		runtime.SetMutexProfileFraction(cfg.Profiling.MutexFraction)
+		runtime.SetBlockProfileRate(cfg.Profiling.BlockRate)
 	}
 
 	// ── 3. Build application (wire dependencies) ────────────────

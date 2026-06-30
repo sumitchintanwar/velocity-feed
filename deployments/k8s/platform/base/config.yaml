@@ -1,0 +1,44 @@
+# ==============================================================================
+# Purpose: Defines the centralized environment variables and secrets for the RTMDS platform.
+# Architecture: ConfigMap and isolated Secrets.
+# Design Decisions: 
+# - Secrets are scoped per dependency to enforce the Principle of Least Privilege.
+# ==============================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rtmds-config
+  namespace: rtmds
+  labels:
+    app.kubernetes.io/part-of: rtmds
+data:
+  ENV: "production"
+  LOG_LEVEL: "info"
+  REDIS_URL: "redis://rtmds-redis:6379"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rtmds-postgres-credentials
+  namespace: rtmds
+  labels:
+    app.kubernetes.io/part-of: rtmds
+type: Opaque
+stringData:
+  POSTGRES_USER: "rtmds_user"
+  POSTGRES_PASSWORD: "rtmds_secret_pass"
+  POSTGRES_DB: "rtmds"
+  POSTGRES_URL: "postgres://rtmds_user:rtmds_secret_pass@rtmds-postgresql:5432/rtmds?sslmode=disable"
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rtmds-redis-credentials
+  namespace: rtmds
+  labels:
+    app.kubernetes.io/part-of: rtmds
+type: Opaque
+stringData:
+  REDIS_PASSWORD: "" # Empty by default, populated by Secret Manager in prod if auth enabled

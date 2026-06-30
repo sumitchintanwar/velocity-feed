@@ -1,0 +1,43 @@
+# ─── Test Configuration ──────────────────────────────────────────────────────
+# Minimal configuration for automated tests.
+# All external dependencies are disabled.
+server:
+  host: "127.0.0.1"
+  port: 0  # Random available port for parallel tests
+  read_timeout: "5s"
+  write_timeout: "5s"
+  shutdown_timeout: "5s"
+
+redis:
+  enabled: false
+  addr: "localhost:6379"
+
+feed:
+  enabled: false
+  symbols: ["TEST"]
+  tick_interval: "100ms"
+
+log:
+  level: "error"  # Minimal logging during tests
+  format: "json"
+
+metrics:
+  enabled: false
+  path: "/metrics"
+
+database:
+  enabled: false
+  host: "localhost"
+  port: 5432
+  user: "postgres"
+  dbname: "rtmds_test"
+  sslmode: "disable"
+
+snapshot:
+  enabled: false
+
+discovery:
+  enabled: false
+
+tracing:
+  enabled: false

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
 )
@@ -45,7 +45,7 @@ func TestPublisher_Publish(t *testing.T) {
 	skipIfNoRedis(t)
 
 	ctx := context.Background()
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()
@@ -84,7 +84,7 @@ func TestSubscriber_ReceivesMessage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()
@@ -130,7 +130,7 @@ func TestMultiGateway_AllReceiveMessage(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	// Use a unique channel prefix to isolate from other tests.
 	const testPrefix = "test:multi:"
@@ -200,7 +200,7 @@ func TestPublisher_Close(t *testing.T) {
 	skipIfNoRedis(t)
 
 	ctx := context.Background()
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()
@@ -244,7 +244,7 @@ func TestSubscriber_Stop(t *testing.T) {
 	skipIfNoRedis(t)
 
 	ctx := context.Background()
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()
@@ -267,7 +267,7 @@ func TestSubscriber_SubscribeUnsubscribe(t *testing.T) {
 	skipIfNoRedis(t)
 
 	ctx := context.Background()
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()
@@ -316,7 +316,7 @@ func TestPublisher_QueueFull(t *testing.T) {
 	skipIfNoRedis(t)
 
 	ctx := context.Background()
-	log := zerolog.New(zerolog.NewTestWriter(t)).Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log := log.New(nil, "test")
 
 	client := redis.NewClient(&redis.Options{Addr: testRedisAddr()})
 	defer client.Close()

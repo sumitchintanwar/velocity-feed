@@ -15,11 +15,15 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/internal/tracing"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var jsonLib = jsoniter.ConfigCompatibleWithStandardLibrary
@@ -29,10 +33,15 @@ var jsonLib = jsoniter.ConfigCompatibleWithStandardLibrary
 const ChannelPrefix = "market:"
 
 // wireEnvelope is the serialization format for events sent over Redis.
+// TraceCtx carries the W3C trace context from the producer, enabling the
+// subscriber to reconstruct the parent span and create a distributed trace.
 type wireEnvelope struct {
-	Symbol string             `json:"symbol"`
-	Type   string             `json:"type"`
-	Raw    jsoniter.RawMessage `json:"raw"`
+	Symbol    string               `json:"symbol"`
+	Type      string               `json:"type"`
+	Seq       int64                `json:"seq,omitempty"`
+	Timestamp time.Time            `json:"timestamp,omitempty"`
+	Raw       jsoniter.RawMessage  `json:"raw"`
+	TraceCtx  tracing.TraceCarrier `json:"trace_ctx,omitempty"`
 }
 
 // publishRequest is an internal message queued for async delivery.
@@ -54,7 +63,7 @@ type publishRequest struct {
 type Publisher struct {
 	client *redis.Client
 	prefix string // channel prefix, default "market:"
-	log    zerolog.Logger
+	log    *log.Logger
 
 	// Async worker pool.
 	queue   chan publishRequest
@@ -86,11 +95,11 @@ func WithQueueSize(n int) PublisherOption {
 }
 
 // NewPublisher creates a Redis-backed Publisher with async workers.
-func NewPublisher(client *redis.Client, log zerolog.Logger, opts ...PublisherOption) *Publisher {
+func NewPublisher(client *redis.Client, l *log.Logger, opts ...PublisherOption) *Publisher {
 	p := &Publisher{
 		client:  client,
 		prefix:  ChannelPrefix,
-		log:     log,
+		log:     l,
 		workers: 4,
 		queue:   make(chan publishRequest, 8192),
 		doneCh:  make(chan struct{}),
@@ -106,12 +115,57 @@ func NewPublisher(client *redis.Client, log zerolog.Logger, opts ...PublisherOpt
 	return p
 }
 
-// worker reads from the publish queue and sends to Redis.
+// worker reads from the publish queue and sends to Redis using pipelining.
 func (p *Publisher) worker(id int) {
 	defer p.wg.Done()
 
+	batch := make([]publishRequest, 0, 128)
+
 	for req := range p.queue {
-		p.doPublish(req.ctx, req.event)
+		batch = append(batch, req)
+		
+		// Drain queue up to batch size limit
+		drain:
+		for len(batch) < 128 {
+			select {
+			case nextReq, ok := <-p.queue:
+				if !ok {
+					break drain
+				}
+				batch = append(batch, nextReq)
+			default:
+				break drain
+			}
+		}
+
+		if len(batch) == 1 {
+			p.doPublish(batch[0].ctx, batch[0].event)
+		} else {
+			p.doPublishBatch(batch)
+		}
+		
+		// Clear batch without reallocating
+		batch = batch[:0]
+	}
+}
+
+func (p *Publisher) doPublishBatch(batch []publishRequest) {
+	pipe := p.client.Pipeline()
+	for _, req := range batch {
+		me, ok := req.event.(*marshaledEvent)
+		if ok {
+			pipe.Publish(req.ctx, me.channel, me.payload)
+		}
+	}
+	_, err := pipe.Exec(context.Background())
+	if err != nil {
+		p.dropped.Add(uint64(len(batch)))
+		if p.dropped.Load()%1000 < uint64(len(batch)) {
+			p.log.Underlying().Warn().Err(err).Uint64("total_dropped", p.dropped.Load()).
+				Int("batch_size", len(batch)).
+				Str("event", "publish_batch_failed").
+				Msg("redis-publisher: batch publish failed (rate-limited)")
+		}
 	}
 }
 
@@ -125,22 +179,28 @@ func (p *Publisher) Publish(ctx context.Context, event marketdata.MarketEvent) {
 	}
 
 	// Serialize inline — this is fast (no network I/O).
-	raw, err := jsonLib.Marshal(event)
-	if err != nil {
-		p.log.Warn().Err(err).Str("symbol", event.EventSymbol()).
-			Msg("redis-publisher: failed to marshal event")
-		return
-	}
+	// Encode as a CachedEvent directly so we don't have to re-encode it at the gateway.
+	ce := marketdata.NewCachedEvent(event)
 
 	env := wireEnvelope{
-		Symbol: event.EventSymbol(),
-		Type:   event.EventType(),
-		Raw:    raw,
+		Symbol:   event.EventSymbol(),
+		Type:     event.EventType(),
+		Raw:      ce.EncodedMsg,
+		TraceCtx: tracing.InjectTraceContext(ctx),
+	}
+
+	// Populate sequence and timestamp if available
+	if seqEv, ok := event.(marketdata.SequencedEvent); ok {
+		env.Seq = seqEv.GetSeq()
+	}
+	if tsEv, ok := event.(marketdata.TimestampedEvent); ok {
+		env.Timestamp = tsEv.GetTimestamp()
 	}
 
 	payload, err := jsonLib.Marshal(env)
 	if err != nil {
-		p.log.Warn().Err(err).Msg("redis-publisher: failed to marshal envelope")
+		p.log.Underlying().Warn().Err(err).Str("event", "envelope_marshal_failed").
+			Msg("redis-publisher: failed to marshal envelope")
 		return
 	}
 
@@ -150,23 +210,38 @@ func (p *Publisher) Publish(ctx context.Context, event marketdata.MarketEvent) {
 	default:
 		p.dropped.Add(1)
 		if p.dropped.Load()%1000 == 1 {
-			p.log.Warn().Uint64("total_dropped", p.dropped.Load()).
+			p.log.Underlying().Warn().Uint64("total_dropped", p.dropped.Load()).
+				Str("event", "queue_full").
 				Msg("redis-publisher: queue full, event dropped (rate-limited)")
 		}
 	}
 }
 
 // doPublish performs the actual Redis publish call (called by workers).
+// Creates a "redis.publish" span to trace the Redis operation.
+// Span attributes follow low-cardinality rules: channel, operation, server.
+// High-cardinality fields (symbol, price) are never set as attributes.
 func (p *Publisher) doPublish(ctx context.Context, event marketdata.MarketEvent) {
 	me, ok := event.(*marshaledEvent)
 	if !ok {
 		return
 	}
 
+	ctx, span := tracing.TracerForComponent("redis").Start(ctx, "redis.publish",
+		trace.WithSpanKind(trace.SpanKindProducer),
+		trace.WithAttributes(
+			attribute.String("redis.channel", me.channel),
+			attribute.String("redis.operation", "publish"),
+		),
+	)
+	defer span.End()
+
 	if err := p.client.Publish(ctx, me.channel, me.payload).Err(); err != nil {
+		span.RecordError(err)
 		p.dropped.Add(1)
 		if p.dropped.Load()%1000 == 1 {
-			p.log.Warn().Err(err).Uint64("total_dropped", p.dropped.Load()).
+			p.log.Underlying().Warn().Err(err).Uint64("total_dropped", p.dropped.Load()).
+				Str("event", "publish_failed").
 				Msg("redis-publisher: publish failed (rate-limited)")
 		}
 	}

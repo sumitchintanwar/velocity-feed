@@ -19,6 +19,7 @@ TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 BENCH_DURATION="${BENCH_DURATION:-60}"
 CLIENT_COUNT="${CLIENT_COUNT:-100}"
 SYMBOL_COUNT="${SYMBOL_COUNT:-5}"
+CHURN_RATE="${CHURN_RATE:-5.0}" # 5% connection drop/reconnect per minute for realism
 
 # Colors
 RED='\033[0;31m'
@@ -143,6 +144,7 @@ run_benchmark() {
         -clients "$CLIENT_COUNT" \
         -symbols "$SYMBOL_COUNT" \
         -duration "${BENCH_DURATION}s" \
+        -churn_rate "$CHURN_RATE" \
         -output "${scenario_dir}/benchmark.json" 2>&1 | tee "${scenario_dir}/benchmark.log"; then
         
         log_ok "Benchmark completed successfully"
@@ -200,9 +202,11 @@ generate_final_report() {
 # RTMDS Distributed Benchmark Report
 
 **Date:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")
-**Duration:** ${BENCH_DURATION}s per scenario
+**Duration:** ${BENCH_DURATION}s per scenario (Use >900s for official soak tests)
 **Clients:** ${CLIENT_COUNT}
-**Symbols:** ${SYMBOL_COUNT}
+**Symbols:** ${SYMBOL_COUNT} (Zipfian distribution)
+**Client Churn Rate:** ${CHURN_RATE}%/min (Authenticates Handshake Overhead)
+**Payload Size:** ~128 bytes JSON per quote
 
 ---
 

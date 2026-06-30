@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 )
 
 // testPublisher counts published events.
@@ -19,8 +19,8 @@ func (p *testPublisher) Publish(_ context.Context, _ any) {
 	p.count.Add(1)
 }
 
-func nopLogger() zerolog.Logger {
-	return zerolog.Nop()
+func nopLogger() *log.Logger {
+	return log.New(nil, "test")
 }
 
 // ---------- Basic Functionality ----------

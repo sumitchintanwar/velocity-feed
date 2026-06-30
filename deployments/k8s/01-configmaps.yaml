@@ -1,0 +1,52 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: rtmds-config
+  namespace: rtmds
+data:
+  # Gateway Server Configuration
+  RTMDS_SERVER_HOST: "0.0.0.0"
+  RTMDS_SERVER_PORT: "8080"
+  RTMDS_REDIS_ENABLED: "true"
+  RTMDS_REDIS_ADDR: "redis.rtmds.svc.cluster.local:6379"
+  RTMDS_FEED_SYMBOLS: "AAPL,TSLA,MSFT,GOOGL,AMZN"
+  RTMDS_LOG_LEVEL: "info"
+  RTMDS_LOG_FORMAT: "json"
+  RTMDS_METRICS_ENABLED: "true"
+  RTMDS_DATABASE_ENABLED: "true"
+  RTMDS_DATABASE_HOST: "postgres.rtmds.svc.cluster.local"
+  RTMDS_DATABASE_PORT: "5432"
+  RTMDS_DATABASE_USER: "postgres"
+  RTMDS_DATABASE_DBNAME: "rtmds"
+  RTMDS_DATABASE_SSLMODE: "disable"
+  RTMDS_SNAPSHOT_ENABLED: "true"
+  RTMDS_SNAPSHOT_CHECKPOINT_PATH: "/data/snapshot.json"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: rtmds
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+    scrape_configs:
+      - job_name: 'rtmds-gateway'
+        kubernetes_sd_configs:
+          - role: pod
+            namespaces:
+              names: ['rtmds']
+        relabel_configs:
+          - source_labels: [__meta_kubernetes_pod_label_app]
+            action: keep
+            regex: rtmds-server
+          - source_labels: [__meta_kubernetes_pod_container_port_name]
+            action: keep
+            regex: http
+      - job_name: 'redis-exporter'
+        static_configs:
+          - targets: ['redis-exporter.rtmds.svc.cluster.local:9121']
+      - job_name: 'postgres-exporter'
+        static_configs:
+          - targets: ['postgres-exporter.rtmds.svc.cluster.local:9187']

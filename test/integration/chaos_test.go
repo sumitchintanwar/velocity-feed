@@ -10,8 +10,8 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/distribution/redisbus"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
 )
@@ -19,19 +19,16 @@ import (
 // chaosSkipIfDocker skips if docker compose stack is not running.
 func chaosSkipIfDocker(t *testing.T) {
 	t.Helper()
-	out, err := exec.Command("docker", "compose", "-f", "docker-compose.sticky.yml", "ps", "--format", "json").Output()
+	// Run from project root to find docker-compose.sticky.yml
+	cmd := exec.Command("docker", "compose", "-f", "docker-compose.sticky.yml", "ps", "--services")
+	cmd.Dir = "E:\\Sumit Codes\\Season\\GS_Summer_Analyst_27\\Real Time Market Data System"
+	out, err := cmd.Output()
 	if err != nil {
 		t.Skipf("skipping: docker compose not available: %v", err)
 	}
-	running := 0
-	for _, line := range splitLines(string(out)) {
-		if line == "" {
-			continue
-		}
-		running++
-	}
-	if running < 4 { // redis + 3 gateways + nginx
-		t.Skipf("skipping: stack not fully up (found %d services)", running)
+	services := splitLines(string(out))
+	if len(services) < 4 {
+		t.Skipf("skipping: stack not fully up (found %d services)", len(services))
 	}
 }
 
@@ -372,7 +369,7 @@ func TestChaos_DataFlowVerification(t *testing.T) {
 	defer redisClient.Close()
 	prefix := testPrefix(t)
 	ctx := context.Background()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 
 	pubClient := newTestRedisClient(t)

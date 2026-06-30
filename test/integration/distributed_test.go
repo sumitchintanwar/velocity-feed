@@ -14,9 +14,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/distribution/redisbus"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
@@ -58,7 +58,7 @@ func TestRedisSubscriberWithRouter(t *testing.T) {
 	defer redisClient.Close()
 	prefix := testPrefix(t)
 	ctx := context.Background()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 
 	pubClient := redis.NewClient(&redis.Options{Addr: redisClient.Options().Addr})
@@ -126,7 +126,7 @@ func TestCrossGatewayDelivery(t *testing.T) {
 	defer redisClient.Close()
 	prefix := testPrefix(t)
 	ctx := context.Background()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 
 	pubClient := redis.NewClient(&redis.Options{Addr: redisClient.Options().Addr})
@@ -205,7 +205,7 @@ func TestCrossGatewayMultipleClients(t *testing.T) {
 	defer redisClient.Close()
 	prefix := testPrefix(t)
 	ctx := context.Background()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 
 	pubClient := redis.NewClient(&redis.Options{Addr: redisClient.Options().Addr})
@@ -302,7 +302,7 @@ func TestWebSocketCrossGateway(t *testing.T) {
 	defer redisClient.Close()
 	prefix := testPrefix(t)
 	ctx := context.Background()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 	_, _ = platform.NewMetrics("rtmds_test")
 
@@ -436,7 +436,7 @@ func TestWebSocketCrossGateway(t *testing.T) {
 
 func TestDynamicSubscriptionLifecycle(t *testing.T) {
 	_ = skipIfNoRedis(t)
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	queueCfg := newTestQueueCfg()
 
 	tm := topicmanager.NewWithQueue(0, queueCfg, log, nil, nil)

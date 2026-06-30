@@ -1,0 +1,70 @@
+global:
+  resolve_timeout: 5m
+  # Smtp/Slack global configs would go here
+
+route:
+  group_by: ['alertname', 'cluster', 'service', 'environment']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  # Default receiver for alerts that do not match the routing tree below
+  receiver: 'team-platform-fallback'
+  
+  routes:
+    # 1. Infrastructure Routing
+    - matchers:
+        - team="infrastructure"
+      receiver: 'team-infrastructure'
+      group_by: ['alertname', 'instance']
+
+    # 2. Market Data Routing (High priority business logic)
+    - matchers:
+        - team="market_data"
+      receiver: 'team-market-data'
+      group_by: ['alertname', 'service', 'topic']
+      routes:
+        - matchers:
+            - severity="critical"
+          receiver: 'team-market-data-pager'
+
+    # 3. Business / Client Routing
+    - matchers:
+        - team="business"
+      receiver: 'team-business'
+      group_by: ['alertname']
+
+    # 4. Platform Routing (Redis, Postgres, Up/Down statuses)
+    - matchers:
+        - team="platform"
+      receiver: 'team-platform'
+
+inhibit_rules:
+  # If a Node/Host goes down, inhibit all target-level alerts on that host (e.g. ServiceDown, HighLatency)
+  - source_matchers:
+      - alertname="NodeDown"
+    target_matchers:
+      - severity=~"critical|high|medium|low"
+    equal: ['instance']
+
+  # If Redis is completely down, inhibit Latency and Throughput alerts from Publisher/Gateway
+  # because they are guaranteed to fail and the root cause is Redis.
+  - source_matchers:
+      - alertname="RedisDown"
+    target_matchers:
+      - team="market_data"
+    equal: ['environment', 'cluster']
+  
+  # If the Publisher is down, inhibit Gateway lack-of-throughput alerts
+  - source_matchers:
+      - alertname="PublisherDown"
+    target_matchers:
+      - alertname="ZeroThroughputAnomaly"
+    equal: ['environment']
+
+receivers:
+  - name: 'team-infrastructure'
+  - name: 'team-market-data'
+  - name: 'team-market-data-pager'
+  - name: 'team-business'
+  - name: 'team-platform'
+  - name: 'team-platform-fallback'

@@ -37,8 +37,19 @@ type Metrics struct {
 	WSMessageSize            prometheus.Histogram
 	WSDeliveryLatency        prometheus.Histogram
 	WSPingLatency            prometheus.Histogram
+	WSPingSentTotal          prometheus.Counter
+	WSPongReceivedTotal      prometheus.Counter
+	WSTimeoutsTotal          prometheus.Counter
+	WSHeartbeatCleanupsTotal prometheus.Counter
 	WSAuthFailures           prometheus.Counter
 	WSHandshakeDuration      prometheus.Histogram
+
+	// Reconnect layer
+	WSReconnectAttemptsTotal prometheus.Counter
+	WSReconnectSuccessTotal  prometheus.Counter
+	WSReconnectFailuresTotal prometheus.Counter
+	WSResubscriptionsTotal   prometheus.Counter
+	WSSequenceGaps           prometheus.Counter // sequence gaps detected in writePump
 
 	// Build info
 	BuildInfo *prometheus.GaugeVec // labels: version, revision
@@ -207,6 +218,34 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Buckets:   []float64{0.001, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0},
 		}),
 
+		WSPingSentTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "ping_sent_total",
+			Help:      "Total number of WebSocket ping frames sent to clients.",
+		}),
+
+		WSPongReceivedTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "pong_received_total",
+			Help:      "Total number of WebSocket pong frames received from clients.",
+		}),
+
+		WSTimeoutsTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "heartbeat_timeouts_total",
+			Help:      "Total number of clients disconnected due to heartbeat timeout.",
+		}),
+
+		WSHeartbeatCleanupsTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "heartbeat_cleanups_total",
+			Help:      "Total number of dead connections cleaned up by the heartbeat system.",
+		}),
+
 		WSAuthFailures: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "websocket",
@@ -220,6 +259,41 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Name:      "handshake_duration_seconds",
 			Help:      "Duration of the WebSocket HTTP upgrade handshake.",
 			Buckets:   prometheus.DefBuckets,
+		}),
+
+		WSReconnectAttemptsTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "reconnect_attempts_total",
+			Help:      "Total number of WebSocket reconnection attempts.",
+		}),
+
+		WSReconnectSuccessTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "reconnect_success_total",
+			Help:      "Total number of successful WebSocket reconnections.",
+		}),
+
+		WSReconnectFailuresTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "reconnect_failures_total",
+			Help:      "Total number of failed WebSocket reconnection attempts.",
+		}),
+
+		WSResubscriptionsTotal: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "resubscriptions_total",
+			Help:      "Total number of automatic resubscriptions after reconnection.",
+		}),
+
+		WSSequenceGaps: f.NewCounter(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "sequence_gaps_total",
+			Help:      "Total number of sequence gaps detected in the writePump hot path.",
 		}),
 
 		// ── Build info ──────────────────────────────────────────

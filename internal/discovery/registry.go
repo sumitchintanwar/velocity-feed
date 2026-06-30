@@ -26,7 +26,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 )
 
 const (
@@ -60,7 +60,7 @@ type GatewayInfo struct {
 // Registry provides gateway service discovery operations backed by Redis.
 type Registry struct {
 	client  *redis.Client
-	log     zerolog.Logger
+	log     *log.Logger
 	ttl     time.Duration
 	hbEvery time.Duration
 
@@ -96,10 +96,10 @@ func WithHealthCheck(fn func() bool) RegistryOption {
 }
 
 // NewRegistry creates a Redis-backed service registry.
-func NewRegistry(client *redis.Client, log zerolog.Logger, opts ...RegistryOption) *Registry {
+func NewRegistry(client *redis.Client, l *log.Logger, opts ...RegistryOption) *Registry {
 	r := &Registry{
 		client:  client,
-		log:     log,
+		log:     l,
 		ttl:     defaultTTL,
 		hbEvery: defaultHeartbeatInterval,
 	}
@@ -130,10 +130,11 @@ func (r *Registry) Register(ctx context.Context, info GatewayInfo) error {
 		return fmt.Errorf("registry: register %s: %w", info.ID, err)
 	}
 
-	r.log.Info().
+	r.log.Underlying().Info().
 		Str("id", info.ID).
 		Str("addr", info.Addr).
 		Int("port", info.Port).
+		Str("event", "gateway_registered").
 		Msg("gateway registered")
 
 	return nil
@@ -182,7 +183,7 @@ func (r *Registry) Deregister(ctx context.Context, gatewayID string) error {
 		return fmt.Errorf("registry: deregister %s: %w", gatewayID, err)
 	}
 
-	r.log.Info().Str("id", gatewayID).Msg("gateway deregistered")
+	r.log.Underlying().Info().Str("id", gatewayID).Str("event", "gateway_deregistered").Msg("gateway deregistered")
 	return nil
 }
 
@@ -224,7 +225,7 @@ func (r *Registry) List(ctx context.Context) ([]GatewayInfo, error) {
 		}
 		var info GatewayInfo
 		if err := json.Unmarshal([]byte(raw), &info); err != nil {
-			r.log.Warn().Err(err).Msg("registry: skipping malformed entry")
+			r.log.Underlying().Warn().Err(err).Str("event", "registry_malformed_entry").Msg("registry: skipping malformed entry")
 			continue
 		}
 		gateways = append(gateways, info)
@@ -274,20 +275,20 @@ func (r *Registry) heartbeatLoop(ctx context.Context, info GatewayInfo) {
 		case <-ticker.C:
 			// Deep health check: skip heartbeat if local gateway is unhealthy.
 			if r.isHealthy != nil && !r.isHealthy() {
-				r.log.Warn().
-					Str("id", info.ID).
-					Msg("heartbeat: skipping — local health check failed")
+			r.log.Underlying().Warn().Str("id", info.ID).
+				Str("event", "heartbeat_skipped").
+				Msg("heartbeat: skipping — local health check failed")
 				continue
 			}
 
 			info.LastHeartbeat = time.Now()
 			data, err := json.Marshal(info)
 			if err != nil {
-				r.log.Warn().Err(err).Msg("heartbeat: marshal failed")
+				r.log.Underlying().Warn().Err(err).Str("event", "heartbeat_marshal_failed").Msg("heartbeat: marshal failed")
 				continue
 			}
 			if err := r.client.Set(ctx, keyFor(info.ID), data, r.ttl).Err(); err != nil {
-				r.log.Warn().Err(err).Str("id", info.ID).Msg("heartbeat: refresh failed")
+				r.log.Underlying().Warn().Err(err).Str("id", info.ID).Str("event", "heartbeat_refresh_failed").Msg("heartbeat: refresh failed")
 			}
 		}
 	}

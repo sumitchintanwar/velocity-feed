@@ -215,7 +215,7 @@ func TestPool_Run_MockServer(t *testing.T) {
 			}
 
 			// Send quotes.
-			ticker := time.NewTicker(time.Millisecond)
+			ticker := time.NewTicker(100 * time.Millisecond)
 			defer ticker.Stop()
 
 			for {

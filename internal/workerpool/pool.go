@@ -16,7 +16,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 )
 
 // Publisher is the interface for event delivery. Implemented by
@@ -63,7 +63,7 @@ type PoolStats struct {
 type Pool struct {
 	cfg       Config
 	publisher Publisher
-	log       zerolog.Logger
+	log       *log.Logger
 	stats     PoolStats
 	metrics   *Metrics
 
@@ -77,7 +77,7 @@ type Pool struct {
 
 // New creates a Pool with the given config. Call Start to begin processing.
 // metrics can be nil — in that case, only atomic PoolStats are updated.
-func New(cfg Config, publisher Publisher, log zerolog.Logger, metrics *Metrics) *Pool {
+func New(cfg Config, publisher Publisher, l *log.Logger, metrics *Metrics) *Pool {
 	if cfg.Workers <= 0 {
 		cfg.Workers = 8
 	}
@@ -91,7 +91,7 @@ func New(cfg Config, publisher Publisher, log zerolog.Logger, metrics *Metrics) 
 	return &Pool{
 		cfg:       cfg,
 		publisher: publisher,
-		log:       log,
+		log:       l,
 		metrics:   metrics,
 		queue:     make(chan any, cfg.QueueCapacity),
 	}
@@ -163,9 +163,10 @@ func (p *Pool) Start(ctx context.Context) {
 		p.wg.Add(1)
 		go p.worker(ctx, i)
 	}
-	p.log.Info().
+	p.log.Underlying().Info().
 		Int("workers", p.cfg.Workers).
 		Int("queue_capacity", p.cfg.QueueCapacity).
+		Str("event", "worker_pool_started").
 		Msg("worker pool started")
 }
 
@@ -211,9 +212,10 @@ func (p *Pool) processEvent(ctx context.Context, id int, event any) {
 				if p.metrics != nil {
 					p.metrics.TasksFailed.Inc()
 				}
-				p.log.Error().
+				p.log.Underlying().Error().
 					Int("worker", id).
 					Interface("panic", r).
+					Str("event", "worker_panic_recovered").
 					Msg("worker panic recovered")
 			}
 			// QS1: always count as processed (recovered or not).
@@ -259,18 +261,19 @@ func (p *Pool) Shutdown(ctx context.Context) error {
 
 		select {
 		case <-done:
-			p.log.Info().
-				Int64("processed", p.stats.Processed.Load()).
-				Int64("dropped", p.stats.Dropped.Load()).
-				Int64("panics", p.stats.Panics.Load()).
-				Msg("worker pool shut down")
+		p.log.Underlying().Info().
+			Int64("processed", p.stats.Processed.Load()).
+			Int64("dropped", p.stats.Dropped.Load()).
+			Int64("panics", p.stats.Panics.Load()).
+			Str("event", "worker_pool_shut_down").
+			Msg("worker pool shut down")
 		case <-shutdownCtx.Done():
 			// D1/GL1: workers stuck in blocking Publish — cancel
 			// context to force-exit them.
 			if p.cancel != nil {
 				p.cancel()
 			}
-			p.log.Warn().Msg("worker pool shutdown timed out")
+			p.log.Underlying().Warn().Str("event", "worker_pool_shutdown_timeout").Msg("worker pool shutdown timed out")
 			err = fmt.Errorf("worker pool shutdown: %w", shutdownCtx.Err())
 		}
 	})

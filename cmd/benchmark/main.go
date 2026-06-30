@@ -3,11 +3,11 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"flag"
 	"fmt"
-	"log"
 	"math"
 	"math/rand"
 	"net/http"
@@ -19,9 +19,9 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/sumit/rtmds/internal/log"
 )
 
-// BenchmarkConfig holds benchmark parameters.
 type BenchmarkConfig struct {
 	WebSocketURL   string
 	NumClients     int
@@ -30,30 +30,30 @@ type BenchmarkConfig struct {
 	RampUp         time.Duration
 	ReportInterval time.Duration
 	OutputFile     string
+	ChurnRate      float64
 }
 
-// LatencyHistogram tracks latency distribution.
-type LatencyHistogram struct {
-	Buckets []float64
-	Counts  []int
-	Total   int
-	Sum     float64
-	Min     float64
-	Max     float64
-	mu      sync.Mutex
+const HighResMaxMs = 10000.0
+const HighResPrecisionMs = 0.1
+const HighResBuckets = int(HighResMaxMs / HighResPrecisionMs)
+
+// HighResHistogram tracks latency distribution with high precision.
+type HighResHistogram struct {
+	Counts [HighResBuckets + 1]int
+	Total  int
+	Sum    float64
+	Min    float64
+	Max    float64
+	mu     sync.Mutex
 }
 
-// NewLatencyHistogram creates a histogram with predefined buckets.
-func NewLatencyHistogram() *LatencyHistogram {
-	return &LatencyHistogram{
-		Buckets: []float64{0.1, 0.25, 0.5, 1, 2.5, 5, 10, 25, 50, 100, 250, 500, 1000},
-		Counts:  make([]int, 14),
-		Min:     math.MaxFloat64,
+func NewHighResHistogram() *HighResHistogram {
+	return &HighResHistogram{
+		Min: math.MaxFloat64,
 	}
 }
 
-// Record adds a latency sample in milliseconds.
-func (h *LatencyHistogram) Record(ms float64) {
+func (h *HighResHistogram) Record(ms float64) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -66,17 +66,16 @@ func (h *LatencyHistogram) Record(ms float64) {
 		h.Max = ms
 	}
 
-	for i, bucket := range h.Buckets {
-		if ms <= bucket {
-			h.Counts[i]++
-			return
-		}
+	idx := int(ms / HighResPrecisionMs)
+	if idx < 0 {
+		idx = 0
+	} else if idx >= HighResBuckets {
+		idx = HighResBuckets
 	}
-	h.Counts[len(h.Counts)-1]++ // overflow bucket
+	h.Counts[idx]++
 }
 
-// Percentile returns the p-th percentile latency.
-func (h *LatencyHistogram) Percentile(p float64) float64 {
+func (h *HighResHistogram) Percentile(p float64) float64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
@@ -88,17 +87,16 @@ func (h *LatencyHistogram) Percentile(p float64) float64 {
 	for i, count := range h.Counts {
 		cumulative += count
 		if cumulative >= target {
-			if i < len(h.Buckets) {
-				return h.Buckets[i]
+			if i == HighResBuckets {
+				return h.Max
 			}
-			return h.Buckets[len(h.Buckets)-1] * 2
+			return float64(i) * HighResPrecisionMs
 		}
 	}
 	return h.Max
 }
 
-// Mean returns the average latency.
-func (h *LatencyHistogram) Mean() float64 {
+func (h *HighResHistogram) Mean() float64 {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	if h.Total == 0 {
@@ -107,23 +105,39 @@ func (h *LatencyHistogram) Mean() float64 {
 	return h.Sum / float64(h.Total)
 }
 
-// Print outputs the histogram to stdout.
-func (h *LatencyHistogram) Print() {
+func (h *HighResHistogram) Print() {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	fmt.Println("  Latency Distribution:")
-	for i, bucket := range h.Buckets {
-		pct := float64(h.Counts[i]) / float64(h.Total) * 100
-		bar := ""
-		for j := 0; j < int(pct/2); j++ {
-			bar += "#"
+	fmt.Println("  Latency Distribution (High Res):")
+	buckets := []float64{0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000}
+	
+	fmt.Printf("    %10s  %6s %s\n", "Range", "Count", "Percent")
+	cumulative := 0
+	lastBucket := 0.0
+	
+	for _, b := range buckets {
+		count := 0
+		startIdx := int(lastBucket / HighResPrecisionMs)
+		endIdx := int(b / HighResPrecisionMs)
+		if endIdx > HighResBuckets {
+			endIdx = HighResBuckets
 		}
-		label := fmt.Sprintf("%.1fms", bucket)
-		if i == len(h.Buckets)-1 {
-			label = fmt.Sprintf(">%0.1fms", h.Buckets[i-1])
+		for i := startIdx; i < endIdx; i++ {
+			count += h.Counts[i]
 		}
-		fmt.Printf("    %10s  %6d (%5.1f%%) %s\n", label, h.Counts[i], pct, bar)
+		cumulative += count
+		if h.Total > 0 {
+			pct := float64(count) / float64(h.Total) * 100
+			fmt.Printf("    <=%7.1fms  %6d (%5.1f%%)\n", b, count, pct)
+		}
+		lastBucket = b
+	}
+	
+	overflow := h.Total - cumulative
+	if overflow > 0 && h.Total > 0 {
+		pct := float64(overflow) / float64(h.Total) * 100
+		fmt.Printf("    > %7.1fms  %6d (%5.1f%%)\n", lastBucket, overflow, pct)
 	}
 }
 
@@ -174,10 +188,16 @@ var (
 	totalBytes    atomic.Int64
 	connected     atomic.Int32
 	failed        atomic.Int32
-	latencyHist   = NewLatencyHistogram()
+	latencyHist   = NewHighResHistogram()
+	benchLogger   *log.Logger
 )
 
 func main() {
+	benchLogger = log.NewFromConfig(log.Config{
+		Service: "benchmark",
+		Format:  "text",
+	})
+
 	config := parseFlags()
 
 	ctx, cancel := context.WithTimeout(context.Background(), config.Duration+config.RampUp+10*time.Second)
@@ -244,13 +264,13 @@ func main() {
 			if err == nil {
 				break
 			}
-			log.Printf("Client %d connect attempt %d failed: %v", i, retries+1, err)
+			log.Warn(context.Background(), benchLogger).Int("client_id", i).Int("attempt", retries+1).Err(err).Msg("Connect attempt failed")
 			time.Sleep(time.Duration(retries+1) * 100 * time.Millisecond)
 		}
 
 		if conn == nil {
 			failed.Add(1)
-			log.Printf("Client %d failed after 3 retries", i)
+			log.Error(context.Background(), benchLogger).Int("client_id", i).Msg("Client failed after 3 retries")
 			continue
 		}
 
@@ -274,6 +294,12 @@ func main() {
 	if !interrupted && connected.Load() > 0 {
 		fmt.Printf("Running benchmark for %v...\n\n", config.Duration)
 
+		// Connection Churn Simulation
+		if config.ChurnRate > 0 {
+			go churnLoop(ctx, &clientsMu, &clients, config)
+		}
+
+		// Wait for completion
 		benchStart := time.Now()
 
 		// Wait for duration or signal
@@ -320,6 +346,7 @@ func parseFlags() *BenchmarkConfig {
 	flag.DurationVar(&config.RampUp, "rampup", 10*time.Second, "Client ramp-up duration")
 	flag.DurationVar(&config.ReportInterval, "report", 5*time.Second, "Metrics report interval")
 	flag.StringVar(&config.OutputFile, "output", "", "Output JSON file")
+	flag.Float64Var(&config.ChurnRate, "churn_rate", 0.0, "Percentage of clients to randomly disconnect/reconnect per minute (e.g. 5.0 for 5%)")
 	flag.Parse()
 	return config
 }
@@ -359,10 +386,45 @@ func generateSymbols(n int) []string {
 	symbols := []string{"AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "JNJ",
 		"WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM", "CSCO", "VZ",
 		"INTC", "KO", "CVX", "MRK", "PFE", "TMO", "ABT", "COST", "AVGO", "NKE"}
-	if n > len(symbols) {
-		n = len(symbols)
+	
+	// Zipfian distribution simulation
+	// 50% chance to pick from top 3
+	// 30% chance to pick from next 7
+	// 20% chance to pick from remainder
+	selected := make(map[string]bool)
+	var result []string
+	
+	for len(result) < n && len(result) < len(symbols) {
+		r := rand.Float64()
+		var idx int
+		if r < 0.5 {
+			idx = rand.Intn(3)
+		} else if r < 0.8 {
+			idx = 3 + rand.Intn(7)
+		} else {
+			idx = 10 + rand.Intn(len(symbols)-10)
+		}
+		
+		sym := symbols[idx]
+		if !selected[sym] {
+			selected[sym] = true
+			result = append(result, sym)
+		}
 	}
-	return symbols[:n]
+	return result
+}
+
+func extractTimestampFast(msg []byte) string {
+	idx := bytes.Index(msg, []byte(`"timestamp":"`))
+	if idx == -1 {
+		return ""
+	}
+	start := idx + 13
+	end := bytes.IndexByte(msg[start:], '"')
+	if end == -1 {
+		return ""
+	}
+	return string(msg[start : start+end])
 }
 
 func receiveLoop(ctx context.Context, conn *websocket.Conn, clientID int) {
@@ -385,15 +447,10 @@ func receiveLoop(ctx context.Context, conn *websocket.Conn, clientID int) {
 		totalMessages.Add(1)
 		totalBytes.Add(int64(len(message)))
 
-		// Extract timestamp from message for latency measurement
-		var msg struct {
-			Type    string `json:"type"`
-			Payload struct {
-				Timestamp string `json:"timestamp"`
-			} `json:"payload"`
-		}
-		if err := json.Unmarshal(message, &msg); err == nil && msg.Payload.Timestamp != "" {
-			if ts, err := time.Parse(time.RFC3339Nano, msg.Payload.Timestamp); err == nil {
+		// Extract timestamp (zero-allocation fast path)
+		tsStr := extractTimestampFast(message)
+		if tsStr != "" {
+			if ts, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
 				latencyMs := float64(time.Since(ts).Microseconds()) / 1000.0
 				if latencyMs > 0 && latencyMs < 10000 { // filter outliers
 					latencyHist.Record(latencyMs)
@@ -461,15 +518,10 @@ func receiveLoopWithReconnect(ctx context.Context, initialConn *websocket.Conn, 
 		totalMessages.Add(1)
 		totalBytes.Add(int64(len(message)))
 
-		// Extract timestamp from message for latency measurement
-		var msg struct {
-			Type    string `json:"type"`
-			Payload struct {
-				Timestamp string `json:"timestamp"`
-			} `json:"payload"`
-		}
-		if err := json.Unmarshal(message, &msg); err == nil && msg.Payload.Timestamp != "" {
-			if ts, err := time.Parse(time.RFC3339Nano, msg.Payload.Timestamp); err == nil {
+		// Extract timestamp (zero-allocation fast path)
+		tsStr := extractTimestampFast(message)
+		if tsStr != "" {
+			if ts, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
 				latencyMs := float64(time.Since(ts).Microseconds()) / 1000.0
 				if latencyMs > 0 && latencyMs < 10000 { // filter outliers
 					latencyHist.Record(latencyMs)
@@ -521,18 +573,32 @@ func generateResult(config *BenchmarkConfig, duration time.Duration, startTime t
 		Histogram: make([]HistogramBucket, 0),
 	}
 
-	for i, bucket := range latencyHist.Buckets {
-		count := latencyHist.Counts[i]
-		pct := float64(count) / float64(latencyHist.Total) * 100
-		label := fmt.Sprintf("%.1fms", bucket)
-		if i == len(latencyHist.Buckets)-1 {
-			label = fmt.Sprintf(">%0.1fms", latencyHist.Buckets[i-1])
+	buckets := []float64{0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000}
+	lastBucket := 0.0
+	for _, b := range buckets {
+		count := 0
+		startIdx := int(lastBucket / HighResPrecisionMs)
+		endIdx := int(b / HighResPrecisionMs)
+		if endIdx > HighResBuckets {
+			endIdx = HighResBuckets
 		}
-		result.Histogram = append(result.Histogram, HistogramBucket{
-			UpperBound: label,
-			Count:      count,
-			Percent:    pct,
-		})
+		
+		latencyHist.mu.Lock()
+		for i := startIdx; i < endIdx; i++ {
+			count += latencyHist.Counts[i]
+		}
+		latencyHist.mu.Unlock()
+		
+		if latencyHist.Total > 0 {
+			pct := float64(count) / float64(latencyHist.Total) * 100
+			label := fmt.Sprintf("%.1fms", b)
+			result.Histogram = append(result.Histogram, HistogramBucket{
+				UpperBound: label,
+				Count:      count,
+				Percent:    pct,
+			})
+		}
+		lastBucket = b
 	}
 
 	return result
@@ -567,16 +633,39 @@ func printResults(result *BenchmarkResult) {
 func saveResults(filename string, result *BenchmarkResult) {
 	data, err := json.MarshalIndent(result, "", "  ")
 	if err != nil {
-		log.Printf("Failed to marshal results: %v", err)
+		if benchLogger != nil {
+			log.Error(context.Background(), benchLogger).Err(err).Msg("Failed to marshal results")
+		}
 		return
 	}
 
 	if err := os.WriteFile(filename, data, 0644); err != nil {
-		log.Printf("Failed to write results: %v", err)
+		if benchLogger != nil {
+			log.Error(context.Background(), benchLogger).Err(err).Msg("Failed to write results")
+		}
 		return
 	}
 
 	fmt.Printf("\nResults saved to: %s\n", filename)
 }
 
+func churnLoop(ctx context.Context, clientsMu *sync.Mutex, clients *[]*websocket.Conn, config *BenchmarkConfig) {
+	ticker := time.NewTicker(time.Minute)
+	defer ticker.Stop()
 
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			clientsMu.Lock()
+			countToChurn := int(float64(len(*clients)) * (config.ChurnRate / 100.0))
+			for i := 0; i < countToChurn; i++ {
+				idx := rand.Intn(len(*clients))
+				conn := (*clients)[idx]
+				conn.Close() // this will trigger the receiveLoopWithReconnect logic to reconnect
+			}
+			clientsMu.Unlock()
+		}
+	}
+}

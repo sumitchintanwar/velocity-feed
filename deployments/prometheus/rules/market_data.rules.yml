@@ -1,0 +1,45 @@
+groups:
+- name: market_data
+  rules:
+  - alert: ZeroThroughputAnomaly
+    expr: sum(rate(publisher_messages_sent_total[5m])) == 0
+    for: 2m
+    labels:
+      severity: critical
+      team: market_data
+      category: throughput
+    annotations:
+      summary: Zero market data throughput detected
+      description: Publisher is not sending any messages.
+      runbook_url: https://wiki.internal/runbooks/market_data/zero-throughput
+      dashboard_url: /d/market-data-operations
+      related_traces: service=market_data
+      related_metrics: sum(rate(publisher_messages_sent_total[5m])) == 0
+  - alert: SequenceGapDetected
+    expr: sum(rate(publisher_sequence_gaps_total[2m])) > 0
+    for: 1m
+    labels:
+      severity: critical
+      team: market_data
+      category: integrity
+    annotations:
+      summary: Sequence gaps detected
+      description: Data integrity loss.
+      runbook_url: https://wiki.internal/runbooks/market_data/sequence-gaps
+      dashboard_url: /d/market-data-operations
+      related_traces: service=market_data
+      related_metrics: sum(rate(publisher_sequence_gaps_total[2m])) > 0
+  - alert: MessagesDropped
+    expr: sum(rate(gateway_messages_dropped_total[2m])) > 10
+    for: 2m
+    labels:
+      severity: high
+      team: market_data
+      category: reliability
+    annotations:
+      summary: Gateway dropping messages
+      description: Internal queues full.
+      runbook_url: https://wiki.internal/runbooks/market_data/dropped-messages
+      dashboard_url: /d/market-data-operations
+      related_traces: service=market_data
+      related_metrics: sum(rate(gateway_messages_dropped_total[2m])) > 10

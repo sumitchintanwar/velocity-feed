@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
@@ -27,7 +27,7 @@ var (
 func TestMain(m *testing.M) {
 	metrics, _ := platform.NewMetrics("bench_ws")
 	sharedTM = topicmanager.New(0)
-	sharedGateway = NewGateway(sharedTM, zerolog.Nop(), metrics, 0, "bench-gw") // 0 = no rate limit for benchmarks
+	sharedGateway = NewGateway(sharedTM, log.New(nil, "bench"), metrics, 0, "bench-gw") // 0 = no rate limit for benchmarks
 	sharedServer = httptest.NewServer(sharedGateway.Handler())
 	sharedURL = "ws" + strings.TrimPrefix(sharedServer.URL, "http") + "/ws"
 	

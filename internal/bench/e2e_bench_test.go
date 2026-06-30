@@ -12,9 +12,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/feed"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
+	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/topicmanager"
 )
 
@@ -166,9 +168,9 @@ func (f *timedFeed) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 	return out, nil
 }
 
-func newBenchMetrics(prefix string) (*platform.Metrics, zerolog.Logger) {
+func newBenchMetrics(prefix string) (*platform.Metrics, *log.Logger) {
 	m, _ := platform.NewMetrics(prefix)
-	return m, zerolog.Nop()
+	return m, log.New(nil, "test")
 }
 
 // ---------- End-to-End Latency: Pipeline → Bus → Subscriber ----------
@@ -192,7 +194,7 @@ func BenchmarkEndToEndLatency_1000Subs(b *testing.B) {
 func benchE2ELatency(b *testing.B, numSubs int) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_e2e")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	rec := newLatencyRecorder(b.N)
 	var delivered atomic.Int64
@@ -209,7 +211,7 @@ func benchE2ELatency(b *testing.B, numSubs int) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -249,7 +251,7 @@ func benchE2ELatency(b *testing.B, numSubs int) {
 func BenchmarkEndToEndThroughput(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_e2e_tput")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	var delivered atomic.Int64
 	subs := make([]pubsub.Subscription, 100)
@@ -262,7 +264,7 @@ func BenchmarkEndToEndThroughput(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -314,7 +316,7 @@ func BenchmarkEndToEndWithTopicManager(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, &pub, log, nil)
+	p := feed.NewPipeline(f, &pub, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -358,7 +360,7 @@ func (a *topicmanagerPublisherAdapter) Publish(ctx context.Context, event market
 func BenchmarkMemoryPerEvent(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_e2e_mem")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	var delivered atomic.Int64
 	subs := make([]pubsub.Subscription, 10)
@@ -371,7 +373,7 @@ func BenchmarkMemoryPerEvent(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -400,8 +402,8 @@ func BenchmarkMemoryPerEvent(b *testing.B) {
 // ---------- Goroutine Leak Detection ----------
 
 func BenchmarkGoroutineLeakDetection(b *testing.B) {
-	m, log := newBenchMetrics("bench_e2e_leak")
-	bus := pubsub.NewMemoryBus(log, m)
+	m, _ := newBenchMetrics("bench_e2e_leak")
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 	ctx := context.Background()
 
 	// Pre-publish so subscriptions receive a snapshot immediately.
@@ -433,7 +435,7 @@ func BenchmarkGoroutineLeakDetection(b *testing.B) {
 func BenchmarkLatencyHistogram_100Subs(b *testing.B) {
 	f := &timedFeed{symbols: []string{"AAPL"}}
 	m, log := newBenchMetrics("bench_hist")
-	bus := pubsub.NewMemoryBus(log, m)
+	bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 	rec := newLatencyRecorder(b.N)
 	var delivered atomic.Int64
@@ -450,7 +452,7 @@ func BenchmarkLatencyHistogram_100Subs(b *testing.B) {
 		}()
 	}
 
-	p := feed.NewPipeline(f, bus, log, nil)
+	p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 	ctx, cancel := context.WithCancel(context.Background())
 
 	done := make(chan struct{})
@@ -535,7 +537,7 @@ func BenchmarkMemoryScaling(b *testing.B) {
 		b.Run(fmt.Sprintf("subs_%d", numSubs), func(b *testing.B) {
 			f := &timedFeed{symbols: []string{"AAPL"}}
 			m, log := newBenchMetrics("bench_mem_scale")
-			bus := pubsub.NewMemoryBus(log, m)
+			bus := pubsub.NewMemoryBus(zerolog.Nop(), m)
 
 			var delivered atomic.Int64
 			subs := make([]pubsub.Subscription, numSubs)
@@ -548,7 +550,7 @@ func BenchmarkMemoryScaling(b *testing.B) {
 				}()
 			}
 
-			p := feed.NewPipeline(f, bus, log, nil)
+			p := feed.NewPipeline(f, bus, sequencer.New(), log, nil, nil)
 			ctx, cancel := context.WithCancel(context.Background())
 
 			done := make(chan struct{})

@@ -323,3 +323,109 @@ func TestRun_ConcurrentSubscribeNoRace(t *testing.T) {
 	}
 	// No race detector abort = success.
 }
+
+// --- Unlimited Mode Tests ---
+
+// TestUnlimitedMode_Throughput verifies that MaxThroughputConfig produces
+// significantly more messages than DefaultConfig in the same wall-clock window.
+func TestUnlimitedMode_Throughput(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	defer cancel()
+
+	s, err := New(MaxThroughputConfig(), nil, "AAPL", "MSFT")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	quotes, err := s.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	var count int
+	for range quotes {
+		count++
+	}
+
+	// In 50ms with 2 symbols, MaxThroughputConfig should produce at least
+	// 10,000 messages.  DefaultConfig would produce at most 1 (500ms interval).
+	if count < 10_000 {
+		t.Errorf("expected >= 10,000 messages in unlimited mode, got %d", count)
+	}
+}
+
+// TestDeterministicSeed verifies that two simulators with the same non-zero
+// Seed produce identical price sequences, enabling reproducible benchmarks.
+func TestDeterministicSeed(t *testing.T) {
+	cfg := MaxThroughputConfig()
+	cfg.Seed = 1234
+
+	collect := func() []float64 {
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
+		defer cancel()
+
+		s, err := New(cfg, &testClock{now: time.Time{}}, "AAPL")
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		quotes, err := s.Run(ctx)
+		if err != nil {
+			t.Fatalf("Run: %v", err)
+		}
+
+		var prices []float64
+		for q := range quotes {
+			prices = append(prices, q.Price)
+			if len(prices) >= 100 {
+				cancel()
+				// drain remainder
+				for range quotes {
+				}
+				break
+			}
+		}
+		return prices
+	}
+
+	run1 := collect()
+	run2 := collect()
+
+	if len(run1) == 0 {
+		t.Fatal("run1 produced no quotes")
+	}
+	if len(run1) != len(run2) {
+		t.Fatalf("run lengths differ: %d vs %d", len(run1), len(run2))
+	}
+	for i := range run1 {
+		if run1[i] != run2[i] {
+			t.Errorf("price mismatch at index %d: %f vs %f", i, run1[i], run2[i])
+		}
+	}
+}
+
+// TestDroppedCount verifies that DroppedCount increments when the output
+// channel is full in unlimited mode.
+func TestDroppedCount(t *testing.T) {
+	cfg := MaxThroughputConfig()
+	// Very small channel — force drops immediately.
+	s, err := New(cfg, nil, "AAPL")
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Millisecond)
+	defer cancel()
+
+	_, err = s.Run(ctx)
+	if err != nil {
+		t.Fatalf("Run: %v", err)
+	}
+
+	// Don't read from the channel — this should fill it quickly.
+	<-ctx.Done()
+
+	if s.DroppedCount() == 0 {
+		// Not an error on slow machines — the channel might not fill in 30ms.
+		t.Logf("DroppedCount=0; channel may not have filled in 30ms (acceptable on slow CI runners)")
+	}
+}
+

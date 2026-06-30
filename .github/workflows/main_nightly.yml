@@ -1,0 +1,77 @@
+name: Main Branch & Nightly Validation
+
+on:
+  push:
+    branches: [ "main" ]
+  schedule:
+    # Run at 2:00 AM UTC every day
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+
+jobs:
+  heavy-validation:
+    name: Extensive Validation
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          # Read Go version directly from go.mod to ensure single source of truth.
+          go-version-file: go.mod
+          cache: true
+
+      - name: Start Dependencies (Docker Compose)
+        # Spin up localized external dependencies like Redis/PostgreSQL for integration testing.
+        # Use readiness probes instead of sleep to avoid flaky failures on slow runners.
+        run: |
+          docker compose -f deployments/docker-compose/docker-compose.yml up -d redis postgres
+          until docker compose -f deployments/docker-compose/docker-compose.yml exec -T postgres pg_isready -U postgres; do
+            echo "Waiting for PostgreSQL..."; sleep 1;
+          done
+          until docker compose -f deployments/docker-compose/docker-compose.yml exec -T redis redis-cli ping | grep -q PONG; do
+            echo "Waiting for Redis..."; sleep 1;
+          done
+          echo "All dependencies are ready."
+
+      - name: Full Integration & Race Tests
+        # Runs all tests, including those without -short, enforcing strict race detection across the entire codebase
+        run: go test -v -race ./...
+        env:
+          REDIS_URL: localhost:6379
+          POSTGRES_URL: postgres://postgres:postgres@localhost:5432/rtmds?sslmode=disable
+
+      - name: Microbenchmarks
+        # Runs basic benchmarks to catch obvious performance regressions.
+        # Output is uploaded as an artifact so results can be inspected and compared over time.
+        run: go test -bench=. -benchmem -benchtime=1s -run=^$ ./... | tee benchmark_results.txt
+
+      - name: Upload Benchmark Results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results-${{ github.run_id }}
+          path: benchmark_results.txt
+          retention-days: 30
+
+      - name: Stop Dependencies
+        if: always()
+        run: docker compose -f deployments/docker-compose/docker-compose.yml down
+
+      - name: Compile Release Binaries
+        run: |
+          mkdir -p bin
+          go build -o bin/server ./cmd/server
+          go build -o bin/benchmark ./cmd/benchmark
+          go build -o bin/testclient ./cmd/testclient
+
+      - name: Upload Artifacts
+        # Artifacts are generated but not automatically deployed (Continuous Delivery only)
+        uses: actions/upload-artifact@v4
+        with:
+          name: rtmds-binaries
+          path: bin/
+          retention-days: 7

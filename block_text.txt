@@ -1,0 +1,26 @@
+File: main.exe
+Build ID: C:\Users\sumit\AppData\Local\go-build\e5\e5272c6ea0311287a7195d6d3492d5a3dadbdcf52a26f0ca61b2478801b3f07b-d\main.exe2026-06-29 14:42:26.0229109 +0530 IST
+Type: delay
+Time: 2026-06-29 14:46:06 IST
+Showing nodes accounting for 15420.92s, 100% of 15421.12s total
+Dropped 70 nodes (cum <= 77.11s)
+      flat  flat%   sum%        cum   cum%
+ 15261.49s 98.96% 98.96%  15261.49s 98.96%  runtime.selectgo
+   159.43s  1.03%   100%    159.43s  1.03%  sync.(*Cond).Wait
+         0     0%   100%    178.30s  1.16%  github.com/sumit/rtmds/internal/adapters/crypto.(*Adapter).Run.func1
+         0     0%   100%    178.49s  1.16%  github.com/sumit/rtmds/internal/adapters/nasdaq.(*Adapter).Run.func1
+         0     0%   100%    178.48s  1.16%  github.com/sumit/rtmds/internal/adapters/nyse.(*Adapter).Run.func1
+         0     0%   100%    178.47s  1.16%  github.com/sumit/rtmds/internal/adapters/simulator.(*Adapter).Run.func1
+         0     0%   100%    177.21s  1.15%  github.com/sumit/rtmds/internal/app.(*App).Run.func3
+         0     0%   100%    159.42s  1.03%  github.com/sumit/rtmds/internal/backpressure.(*CachedChannel).forwardLoop
+         0     0%   100%    159.42s  1.03%  github.com/sumit/rtmds/internal/backpressure.(*CachedRing).WaitForData
+         0     0%   100%    159.42s  1.03%  github.com/sumit/rtmds/internal/backpressure.NewCachedChannel.gowrap1
+         0     0%   100%    714.08s  4.63%  github.com/sumit/rtmds/internal/exchange.(*Manager).Run.func1
+         0     0%   100%    714.08s  4.63%  github.com/sumit/rtmds/internal/exchange.(*Manager).Run.gowrap1
+         0     0%   100%    177.21s  1.15%  github.com/sumit/rtmds/internal/feed.(*Pipeline).Run
+         0     0%   100%    178.49s  1.16%  github.com/sumit/rtmds/internal/marketdata/simulator.(*Simulator).Run.func1
+         0     0%   100%  13287.95s 86.17%  github.com/sumit/rtmds/internal/transport.NewRouter.(*Gateway).Handler.func7.gowrap2
+         0     0%   100%  13287.95s 86.17%  github.com/sumit/rtmds/internal/websocket.(*Client).writePump
+         0     0%   100%    170.10s  1.10%  github.com/sumit/rtmds/internal/websocket.(*HeartbeatManager).Run
+         0     0%   100%    170.10s  1.10%  github.com/sumit/rtmds/internal/websocket.NewGatewayWithSnapshot.gowrap1
+         0     0%   100%    177.21s  1.15%  golang.org/x/sync/errgroup.(*Group).Go.func1

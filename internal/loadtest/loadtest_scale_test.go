@@ -37,8 +37,8 @@ func startScaleMockServer(t *testing.T) (string, func()) {
 			return
 		}
 
-		// Push quotes at 1 kHz.
-		ticker := time.NewTicker(time.Millisecond)
+		// Push quotes at 10 Hz.
+		ticker := time.NewTicker(100 * time.Millisecond)
 		defer ticker.Stop()
 
 		for {

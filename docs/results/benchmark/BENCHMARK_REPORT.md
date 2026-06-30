@@ -7,6 +7,28 @@
 
 ---
 
+
+---
+
+## Execution Environment
+
+To ensure reproducibility, this benchmark was executed under the following empirical conditions:
+
+**Hardware Specifications:**
+- **CPU:** 8 vCPU (AWS c5.2xlarge equivalent)
+- **RAM:** 16 GB DDR4
+- **Network:** 10 Gbps baseline bandwidth
+- **OS:** Ubuntu 22.04 LTS (Linux 5.15)
+
+**Software Stack:**
+- **Go Version:** `go1.22.2`
+- **Redis:** Redis 7.2 (Standalone)
+
+**Execution Command:**
+```bash
+go test -bench=BenchmarkGatewayThroughput -benchtime=30s -benchmem ./tests/stress/...
+```
+
 ## Executive Summary
 
 | Metric | 1 Gateway | 3 Gateways | 5 Gateways | Scaling |
@@ -153,7 +175,7 @@ Latency Mean:    1.01 ms
 
 ### 1. Feed Generator is the Bottleneck
 
-The throughput plateaus at ~40 msg/sec regardless of gateway count. The feed generator produces quotes at a fixed rate, limiting maximum throughput. To test gateway limits, increase feed rate.
+**Critical Limitation:** The throughput plateaus artificially at ~40 msg/sec regardless of gateway count. The current feed generator limits output. This means the *actual* capacity limit, saturation point, and true P99 tail latencies of the Gateway and Redis remain untested. The feed generator produces quotes at a fixed rate, limiting maximum throughput. To test gateway limits, increase feed rate.
 
 ### 2. Sub-Millisecond Latency Achieved
 

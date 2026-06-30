@@ -1,0 +1,103 @@
+File: main.exe
+Build ID: C:\Users\sumit\AppData\Local\go-build\e5\e5272c6ea0311287a7195d6d3492d5a3dadbdcf52a26f0ca61b2478801b3f07b-d\main.exe2026-06-29 14:42:26.0229109 +0530 IST
+Type: goroutine
+Time: 2026-06-29 14:46:05 IST
+Showing nodes accounting for 348, 99.71% of 349 total
+      flat  flat%   sum%        cum   cum%
+       346 99.14% 99.14%        346 99.14%  runtime.gopark
+         1  0.29% 99.43%          1  0.29%  runtime.goroutineProfileWithLabels
+         1  0.29% 99.71%          1  0.29%  runtime.notetsleepg
+         0     0% 99.71%        214 61.32%  github.com/go-chi/chi/v5.(*Mux).ServeHTTP
+         0     0% 99.71%        214 61.32%  github.com/go-chi/chi/v5.(*Mux).routeHTTP
+         0     0% 99.71%        214 61.32%  github.com/go-chi/chi/v5/middleware.RealIP.func1
+         0     0% 99.71%        214 61.32%  github.com/go-chi/chi/v5/middleware.RequestID.func1
+         0     0% 99.71%         16  4.58%  github.com/prometheus/client_golang/prometheus.(*Registry).MustRegister
+         0     0% 99.71%         16  4.58%  github.com/prometheus/client_golang/prometheus/promauto.Factory.NewCounter
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/adapters/crypto.(*Adapter).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/adapters/nasdaq.(*Adapter).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/adapters/nyse.(*Adapter).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/adapters/simulator.(*Adapter).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/app.(*App).Run
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/app.(*App).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/app.(*App).Run.func2
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/app.(*App).Run.func3
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/app.tcpKeepAliveListener.Accept
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/backpressure.(*CachedChannel).forwardLoop
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/backpressure.(*CachedRing).WaitForData
+         0     0% 99.71%         16  4.58%  github.com/sumit/rtmds/internal/clientqueue.NewCachedQueue
+         0     0% 99.71%         16  4.58%  github.com/sumit/rtmds/internal/clientqueue.newQueueMetrics
+         0     0% 99.71%          4  1.15%  github.com/sumit/rtmds/internal/exchange.(*Manager).Run.func1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/exchange.(*Manager).Run.func2
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/feed.(*Pipeline).Run
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/marketdata/simulator.(*Simulator).Run.func1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.HTTPMiddleware.func2.1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.Timeout.func1.1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.loggerMiddleware.func5.1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.prometheusMiddleware.func7.1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.recoveryMiddleware.func6.1
+         0     0% 99.71%        214 61.32%  github.com/sumit/rtmds/internal/middleware.HTTPPipeline.traceLogMiddleware.func4.1
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/platform/admin/api.NewRouter.NewRouter.Authenticate.func6.func33
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/platform/admin/api.NewRouter.NewRouter.RequireRole.func9.func32
+         0     0% 99.71%        212 60.74%  github.com/sumit/rtmds/internal/topicmanager.(*MemoryManager).Subscribe
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/topicmanager.(*MemoryManager).Unsubscribe
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/topicmanager.(*handle).Cancel
+         0     0% 99.71%        213 61.03%  github.com/sumit/rtmds/internal/transport.NewRouter.(*Gateway).Handler.func7
+         0     0% 99.71%         17  4.87%  github.com/sumit/rtmds/internal/transport.NewRouter.(*Gateway).Handler.func7.2
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/transport.NewRouter.StripPrefix.func12
+         0     0% 99.71%         17  4.87%  github.com/sumit/rtmds/internal/websocket.(*Client).cancelAll
+         0     0% 99.71%         17  4.87%  github.com/sumit/rtmds/internal/websocket.(*Client).cancelAll.func1
+         0     0% 99.71%        212 60.74%  github.com/sumit/rtmds/internal/websocket.(*Client).handleMessage
+         0     0% 99.71%        212 60.74%  github.com/sumit/rtmds/internal/websocket.(*Client).readPump
+         0     0% 99.71%        116 33.24%  github.com/sumit/rtmds/internal/websocket.(*Client).writePump
+         0     0% 99.71%         17  4.87%  github.com/sumit/rtmds/internal/websocket.(*Gateway).unregister
+         0     0% 99.71%          1  0.29%  github.com/sumit/rtmds/internal/websocket.(*HeartbeatManager).Run
+         0     0% 99.71%        214 61.32%  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp.(*middleware).serveHTTP
+         0     0% 99.71%        214 61.32%  go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp.NewMiddleware.func2.1
+         0     0% 99.71%         16  4.58%  go.opentelemetry.io/otel/sdk/trace.(*recordingSpan).End
+         0     0% 99.71%         16  4.58%  go.opentelemetry.io/otel/sdk/trace.(*recordingSpan).End.deferwrap1
+         0     0% 99.71%          2  0.57%  golang.org/x/sync/errgroup.(*Group).Go.func1
+         0     0% 99.71%          1  0.29%  golang.org/x/sync/errgroup.(*Group).Wait
+         0     0% 99.71%          1  0.29%  internal/poll.(*FD).Accept
+         0     0% 99.71%          1  0.29%  internal/poll.(*FD).acceptOne
+         0     0% 99.71%          1  0.29%  internal/poll.(*FD).execIO
+         0     0% 99.71%          1  0.29%  internal/poll.(*FD).waitIO
+         0     0% 99.71%          1  0.29%  internal/poll.(*pollDesc).wait
+         0     0% 99.71%          1  0.29%  internal/poll.runtime_pollWait
+         0     0% 99.71%        213 61.03%  internal/sync.(*Mutex).Lock (inline)
+         0     0% 99.71%        213 61.03%  internal/sync.(*Mutex).lockSlow
+         0     0% 99.71%        213 61.03%  internal/sync.runtime_SemacquireMutex
+         0     0% 99.71%          1  0.29%  main.main
+         0     0% 99.71%          1  0.29%  net.(*TCPListener).AcceptTCP
+         0     0% 99.71%          1  0.29%  net.(*TCPListener).accept
+         0     0% 99.71%          1  0.29%  net.(*netFD).accept
+         0     0% 99.71%          1  0.29%  net/http.(*ServeMux).ServeHTTP
+         0     0% 99.71%          1  0.29%  net/http.(*Server).Serve
+         0     0% 99.71%        214 61.32%  net/http.(*conn).serve
+         0     0% 99.71%        214 61.32%  net/http.HandlerFunc.ServeHTTP
+         0     0% 99.71%        214 61.32%  net/http.serverHandler.ServeHTTP
+         0     0% 99.71%          1  0.29%  net/http/pprof.handler.ServeHTTP
+         0     0% 99.71%          1  0.29%  os/signal.NotifyContext.func1
+         0     0% 99.71%          1  0.29%  os/signal.loop
+         0     0% 99.71%          1  0.29%  os/signal.signal_recv
+         0     0% 99.71%          1  0.29%  runtime.chanrecv
+         0     0% 99.71%          1  0.29%  runtime.chanrecv1
+         0     0% 99.71%         16  4.58%  runtime.gopanic
+         0     0% 99.71%        234 67.05%  runtime.goparkunlock (inline)
+         0     0% 99.71%          1  0.29%  runtime.main
+         0     0% 99.71%          1  0.29%  runtime.netpollblock
+         0     0% 99.71%          1  0.29%  runtime.pprof_goroutineProfileWithLabels
+         0     0% 99.71%        110 31.52%  runtime.selectgo
+         0     0% 99.71%        233 66.76%  runtime.semacquire1
+         0     0% 99.71%          1  0.29%  runtime/pprof.(*Profile).WriteTo
+         0     0% 99.71%          1  0.29%  runtime/pprof.writeGoroutine
+         0     0% 99.71%          1  0.29%  runtime/pprof.writeRuntimeProfile
+         0     0% 99.71%          1  0.29%  sync.(*Cond).Wait
+         0     0% 99.71%        213 61.03%  sync.(*Mutex).Lock (inline)
+         0     0% 99.71%         17  4.87%  sync.(*Once).Do (inline)
+         0     0% 99.71%         17  4.87%  sync.(*Once).doSlow
+         0     0% 99.71%         16  4.58%  sync.(*RWMutex).Lock
+         0     0% 99.71%         18  5.16%  sync.(*RWMutex).RLock (inline)
+         0     0% 99.71%          2  0.57%  sync.(*WaitGroup).Wait
+         0     0% 99.71%         18  5.16%  sync.runtime_SemacquireRWMutexR
+         0     0% 99.71%          2  0.57%  sync.runtime_SemacquireWaitGroup
+         0     0% 99.71%          1  0.29%  sync.runtime_notifyListWait

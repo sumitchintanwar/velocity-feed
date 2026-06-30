@@ -1,0 +1,64 @@
+groups:
+- name: platform
+  rules:
+  - alert: RedisDown
+    expr: redis_up == 0 or absent(redis_up)
+    for: 1m
+    labels:
+      severity: critical
+      team: platform
+      category: datastore
+    annotations:
+      summary: Redis is down in production
+      description: Redis instance has been down for 1 minute. Market data pipeline
+        is halted.
+      runbook_url: https://wiki.internal/runbooks/platform/redis-down
+      dashboard_url: /d/platform-operations
+      related_traces: service=redis
+      related_metrics: redis_up == 0 or absent(redis_up)
+  - alert: PostgresDown
+    expr: postgres_up == 0 or absent(postgres_up)
+    for: 1m
+    labels:
+      severity: critical
+      team: platform
+      category: datastore
+    annotations:
+      summary: Postgres is down
+      description: Postgres instance is unreachable.
+      runbook_url: https://wiki.internal/runbooks/platform/postgres-down
+      dashboard_url: /d/platform-operations
+      related_traces: service=postgres
+      related_metrics: postgres_up == 0 or absent(postgres_up)
+  - alert: GatewayQuorumDegraded
+    expr: (count(up{job='rtmds-gateway'} == 1) / count(up{job='rtmds-gateway'})) <
+      0.70
+    for: 2m
+    labels:
+      severity: high
+      team: platform
+      category: service
+    annotations:
+      summary: Gateway Quorum Degraded
+      description: Less than 70% of Gateway instances are healthy.
+      runbook_url: https://wiki.internal/runbooks/platform/gateway-down
+      dashboard_url: /d/platform-operations
+      related_traces: service=rtmds-gateway
+      related_metrics: (count(up{job='rtmds-gateway'} == 1) / count(up{job='rtmds-gateway'}))
+        < 0.70
+  - alert: PublisherQuorumDegraded
+    expr: (count(up{job='rtmds-publisher'} == 1) / count(up{job='rtmds-publisher'}))
+      < 0.70
+    for: 2m
+    labels:
+      severity: high
+      team: platform
+      category: service
+    annotations:
+      summary: Publisher Quorum Degraded
+      description: Less than 70% of Publisher instances are healthy.
+      runbook_url: https://wiki.internal/runbooks/platform/publisher-down
+      dashboard_url: /d/platform-operations
+      related_traces: service=rtmds-publisher
+      related_metrics: (count(up{job='rtmds-publisher'} == 1) / count(up{job='rtmds-publisher'}))
+        < 0.70

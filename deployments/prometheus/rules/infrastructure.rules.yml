@@ -1,0 +1,35 @@
+groups:
+- name: infrastructure
+  rules:
+  - alert: HighCPULoad
+    expr: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode='idle'}[5m]))
+      * 100) > 90
+    for: 5m
+    labels:
+      severity: warning
+      team: infrastructure
+      category: cpu
+    annotations:
+      summary: High CPU load detected
+      description: Node CPU load is > 90%.
+      runbook_url: https://wiki.internal/runbooks/infrastructure/cpu-saturation
+      dashboard_url: /d/platform-operations
+      related_traces: service=infrastructure
+      related_metrics: 100 - (avg by (instance) (rate(node_cpu_seconds_total{mode='idle'}[5m]))
+        * 100) > 90
+  - alert: HighMemoryUsage
+    expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes
+      * 100 > 85
+    for: 5m
+    labels:
+      severity: warning
+      team: infrastructure
+      category: memory
+    annotations:
+      summary: High Memory usage detected
+      description: Memory > 85%.
+      runbook_url: https://wiki.internal/runbooks/infrastructure/memory-saturation
+      dashboard_url: /d/platform-operations
+      related_traces: service=infrastructure
+      related_metrics: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes)
+        / node_memory_MemTotal_bytes * 100 > 85

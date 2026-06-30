@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/redis/go-redis/v9"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 )
 
 // skipIfNoRedis skips the test if Redis is not reachable.
@@ -46,7 +46,7 @@ func cleanupRedis(t *testing.T, client *redis.Client) {
 
 func newTestRegistry(t *testing.T, client *redis.Client) *Registry {
 	t.Helper()
-	log := zerolog.Nop()
+	log := log.New(nil, "test")
 	return NewRegistry(client, log,
 		WithTTL(5*time.Second),
 		WithHeartbeatInterval(1*time.Second),
@@ -224,7 +224,7 @@ func TestRegistry_Count(t *testing.T) {
 
 func TestRegistry_StaleFiltering(t *testing.T) {
 	client := skipIfNoRedis(t)
-	r := NewRegistry(client, zerolog.Nop(),
+	r := NewRegistry(client, log.New(nil, "test"),
 		WithTTL(2*time.Second),
 		WithHeartbeatInterval(1*time.Second),
 	)
@@ -280,7 +280,7 @@ func TestRegistry_StaleFiltering(t *testing.T) {
 
 func TestRegistry_TTLConfig(t *testing.T) {
 	client := skipIfNoRedis(t)
-	r := NewRegistry(client, zerolog.Nop(),
+	r := NewRegistry(client, log.New(nil, "test"),
 		WithTTL(45*time.Second),
 		WithHeartbeatInterval(15*time.Second),
 	)
@@ -295,7 +295,7 @@ func TestRegistry_TTLConfig(t *testing.T) {
 
 func TestRegistry_IndependentTTLs(t *testing.T) {
 	client := skipIfNoRedis(t)
-	r := NewRegistry(client, zerolog.Nop(),
+	r := NewRegistry(client, log.New(nil, "test"),
 		WithTTL(5*time.Second),
 		WithHeartbeatInterval(1*time.Second),
 	)
@@ -347,7 +347,7 @@ func TestRegistry_HealthCheck(t *testing.T) {
 	client := skipIfNoRedis(t)
 
 	healthy := true
-	r := NewRegistry(client, zerolog.Nop(),
+	r := NewRegistry(client, log.New(nil, "test"),
 		WithTTL(3*time.Second),
 		WithHeartbeatInterval(500*time.Millisecond),
 		WithHealthCheck(func() bool { return healthy }),

@@ -1,0 +1,59 @@
+# ─── Docker Compose Configuration ────────────────────────────────────────────
+# Usage: Mounted into container or set via environment variables.
+#
+# This config is designed for the docker-compose.yml stack.
+# Environment variables in docker-compose.yml override these values.
+server:
+  host: "0.0.0.0"
+  port: 8080
+  read_timeout: "10s"
+  write_timeout: "10s"
+  shutdown_timeout: "15s"
+
+redis:
+  enabled: true
+  addr: "redis:6379"
+  # password: ""  # Set via RTMDS_REDIS_PASSWORD env var
+
+feed:
+  enabled: true
+  symbols: ["AAPL", "TSLA", "MSFT", "GOOGL", "AMZN"]
+  tick_interval: "100ms"
+  reconnect_delay: "5s"
+  benchmark_mode: false
+
+log:
+  level: "info"
+  format: "json"
+
+metrics:
+  enabled: true
+  path: "/metrics"
+
+database:
+  enabled: true
+  host: "postgres"
+  port: 5432
+  user: "postgres"
+  # password: ""  # Set via RTMDS_DATABASE_PASSWORD env var
+  dbname: "rtmds"
+  sslmode: "disable"
+  max_open_conns: 10
+  max_idle_conns: 5
+  max_lifetime: "5m"
+
+snapshot:
+  enabled: true
+  checkpoint_path: "data/snapshot.json"
+  checkpoint_interval: "30s"
+  max_age: "24h"
+
+discovery:
+  enabled: true
+  ttl: "30s"
+  heartbeat_interval: "10s"
+
+tracing:
+  enabled: false
+  endpoint: "localhost:4318"
+  sample_ratio: 0.01

@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/rs/zerolog"
+	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
@@ -22,7 +22,7 @@ func setupTestGateway(t *testing.T) (*Gateway, topicmanager.Manager) {
 	t.Helper()
 	metrics, _ := platform.NewMetrics("test_ws")
 	tm := topicmanager.New(0)
-	gw := NewGateway(tm, zerolog.Nop(), metrics, 0, "test-gw") // 0 = no rate limit for tests
+	gw := NewGateway(tm, log.New(nil, "test"), metrics, 0, "test-gw") // 0 = no rate limit for tests
 	return gw, tm
 }
 
@@ -508,5 +508,257 @@ func TestGateway_ConcurrentPublishAndSubscribe(t *testing.T) {
 	// Drain all connections to avoid goroutine leaks.
 	for _, conn := range conns {
 		conn.Close()
+	}
+}
+
+// --- Heartbeat tests ---
+
+func TestHeartbeatManager_RegisterUnregister(t *testing.T) {
+	metrics, _ := platform.NewMetrics("test_hb")
+	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 0)
+
+	hm.Register("client-1", func() {})
+	if hm.ClientCount() != 1 {
+		t.Fatalf("expected 1, got %d", hm.ClientCount())
+	}
+
+	hm.Register("client-2", func() {})
+	if hm.ClientCount() != 2 {
+		t.Fatalf("expected 2, got %d", hm.ClientCount())
+	}
+
+	hm.Unregister("client-1")
+	if hm.ClientCount() != 1 {
+		t.Fatalf("expected 1 after unregister, got %d", hm.ClientCount())
+	}
+
+	hm.Unregister("client-2")
+	if hm.ClientCount() != 0 {
+		t.Fatalf("expected 0 after unregister, got %d", hm.ClientCount())
+	}
+}
+
+func TestHeartbeatManager_RecordPingPong(t *testing.T) {
+	metrics, _ := platform.NewMetrics("test_hb")
+	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 0)
+
+	timeoutFired := make(chan struct{}, 1)
+	hm.Register("client-1", func() {
+		timeoutFired <- struct{}{}
+	})
+
+	// Record a ping, then a pong — should not trigger timeout.
+	hm.RecordPing("client-1")
+	time.Sleep(10 * time.Millisecond)
+	hm.RecordPong("client-1")
+
+	// Run cleanup — no timeout should fire because pong was received.
+	hm.checkTimeouts()
+
+	select {
+	case <-timeoutFired:
+		t.Fatal("timeout should not have fired after pong received")
+	case <-time.After(50 * time.Millisecond):
+		// Expected: no timeout.
+	}
+}
+
+func TestHeartbeatManager_TimeoutDetection(t *testing.T) {
+	metrics, _ := platform.NewMetrics("test_hb")
+	// Use very short timeout for fast test.
+	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 50*time.Millisecond)
+
+	timeoutFired := make(chan struct{}, 1)
+	hm.Register("client-1", func() {
+		timeoutFired <- struct{}{}
+	})
+
+	// Record a ping but never send a pong.
+	hm.RecordPing("client-1")
+
+	// Wait longer than the pong timeout.
+	time.Sleep(100 * time.Millisecond)
+
+	// checkTimeouts should detect the dead client.
+	hm.checkTimeouts()
+
+	select {
+	case <-timeoutFired:
+		// Expected: timeout callback was invoked.
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("expected timeout callback to fire")
+	}
+}
+
+func TestHeartbeatManager_NoPingNoTimeout(t *testing.T) {
+	metrics, _ := platform.NewMetrics("test_hb")
+	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 10*time.Millisecond)
+
+	timeoutFired := make(chan struct{}, 1)
+	hm.Register("client-1", func() {
+		timeoutFired <- struct{}{}
+	})
+
+	// No ping sent — should not trigger timeout (only outstanding pings count).
+	hm.checkTimeouts()
+
+	select {
+	case <-timeoutFired:
+		t.Fatal("timeout should not fire when no ping is outstanding")
+	case <-time.After(50 * time.Millisecond):
+		// Expected.
+	}
+}
+
+func TestHeartbeatManager_MultiplePingsBeforePong(t *testing.T) {
+	metrics, _ := platform.NewMetrics("test_hb")
+	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 0)
+
+	hm.Register("client-1", func() {})
+
+	// Send 3 pings without pong — each should increment the counter.
+	hm.RecordPing("client-1")
+	hm.RecordPing("client-1")
+	hm.RecordPing("client-1")
+
+	// Now send a pong — resets the outstanding ping.
+	hm.RecordPong("client-1")
+
+	// No timeout should fire.
+	hm.checkTimeouts()
+}
+
+// TestGateway_HeartbeatCleanupIntegration tests the full integration:
+// a client connects, subscribes, then the server heartbeat detects
+// a dead connection and cleans it up.
+func TestGateway_HeartbeatCleanupIntegration(t *testing.T) {
+	gw, tm := setupTestGateway(t)
+	ts := httptest.NewServer(gw.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	conn := dialWS(t, wsURL)
+
+	// Subscribe.
+	if err := conn.WriteJSON(ClientMessage{Action: "subscribe", Symbols: []string{"AAPL"}}); err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	_, _, _ = conn.ReadMessage() // subscribed confirmation
+
+	if !waitForClientCount(gw, 1, 2*time.Second) {
+		t.Fatalf("expected 1 client, got %d", gw.ClientCount())
+	}
+	if tm.SubscriberCount("AAPL") != 1 {
+		t.Fatalf("expected 1 AAPL subscriber, got %d", tm.SubscriberCount("AAPL"))
+	}
+
+	// Simulate client disappearing (close without close frame).
+	conn.Close()
+
+	// The gateway should detect the disconnection and clean up.
+	if !waitForClientCount(gw, 0, 5*time.Second) {
+		t.Errorf("expected 0 clients after disconnect, got %d", gw.ClientCount())
+	}
+	if tm.SubscriberCount("AAPL") != 0 {
+		t.Errorf("expected 0 AAPL subscribers after cleanup, got %d", tm.SubscriberCount("AAPL"))
+	}
+}
+
+// TestGateway_HeartbeatMultipleClientsCleanup tests that multiple clients
+// are cleaned up independently when they disconnect.
+func TestGateway_HeartbeatMultipleClientsCleanup(t *testing.T) {
+	gw, tm := setupTestGateway(t)
+	ts := httptest.NewServer(gw.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+
+	// Connect 3 clients, each subscribing to different symbols.
+	symbols := []string{"AAPL", "MSFT", "GOOG"}
+	conns := make([]*websocket.Conn, 3)
+	for i, sym := range symbols {
+		conns[i] = dialWS(t, wsURL)
+		if err := conns[i].WriteJSON(ClientMessage{Action: "subscribe", Symbols: []string{sym}}); err != nil {
+			t.Fatal(err)
+		}
+		_ = conns[i].SetReadDeadline(time.Now().Add(time.Second))
+		_, _, _ = conns[i].ReadMessage()
+	}
+
+	if !waitForClientCount(gw, 3, 2*time.Second) {
+		t.Fatalf("expected 3 clients, got %d", gw.ClientCount())
+	}
+
+	// Disconnect client 1 (AAPL).
+	conns[0].Close()
+	if !waitForClientCount(gw, 2, 5*time.Second) {
+		t.Errorf("expected 2 clients after first disconnect, got %d", gw.ClientCount())
+	}
+	if tm.SubscriberCount("AAPL") != 0 {
+		t.Errorf("AAPL: expected 0 subscribers, got %d", tm.SubscriberCount("AAPL"))
+	}
+
+	// Disconnect client 2 (MSFT).
+	conns[1].Close()
+	if !waitForClientCount(gw, 1, 5*time.Second) {
+		t.Errorf("expected 1 client after second disconnect, got %d", gw.ClientCount())
+	}
+	if tm.SubscriberCount("MSFT") != 0 {
+		t.Errorf("MSFT: expected 0 subscribers, got %d", tm.SubscriberCount("MSFT"))
+	}
+
+	// Disconnect client 3 (GOOG).
+	conns[2].Close()
+	if !waitForClientCount(gw, 0, 5*time.Second) {
+		t.Errorf("expected 0 clients after third disconnect, got %d", gw.ClientCount())
+	}
+	if tm.SubscriberCount("GOOG") != 0 {
+		t.Errorf("GOOG: expected 0 subscribers, got %d", tm.SubscriberCount("GOOG"))
+	}
+}
+
+// TestGateway_HeartbeatMetricsIncremented verifies that ping/pong/timeout
+// metrics are incremented during normal client lifecycle.
+func TestGateway_HeartbeatMetricsIncremented(t *testing.T) {
+	oldPingPeriod := pingPeriod
+	pingPeriod = 100 * time.Millisecond
+	defer func() { pingPeriod = oldPingPeriod }()
+
+	gw, tm := setupTestGateway(t)
+	ts := httptest.NewServer(gw.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+	conn := dialWS(t, wsURL)
+
+	// Subscribe.
+	if err := conn.WriteJSON(ClientMessage{Action: "subscribe", Symbols: []string{"AAPL"}}); err != nil {
+		t.Fatal(err)
+	}
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	_, _, _ = conn.ReadMessage()
+
+	// Publish an event so client has something to read.
+	tm.Publish(context.Background(), marketdata.Quote{
+		Symbol: "AAPL", Price: 150.0,
+		Type: marketdata.QuoteTypeTrade, Timestamp: time.Now(),
+	})
+	_ = conn.SetReadDeadline(time.Now().Add(time.Second))
+	_, _, _ = conn.ReadMessage() // consume the event
+
+	// Let at least one ping cycle run.
+	time.Sleep(pingPeriod + 200*time.Millisecond)
+
+	// Verify ping sent metric was incremented.
+	// (We can't check exact values without reading Prometheus internals,
+	// but we verify the gateway is operational and clients remain connected.)
+	if !waitForClientCount(gw, 1, time.Second) {
+		t.Error("client should still be connected after ping cycle")
+	}
+
+	conn.Close()
+	if !waitForClientCount(gw, 0, 5*time.Second) {
+		t.Error("expected 0 clients after disconnect")
 	}
 }

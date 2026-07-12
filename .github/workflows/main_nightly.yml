@@ -27,9 +27,13 @@ jobs:
       - name: Start Dependencies (Docker Compose)
         # Spin up localized external dependencies like Redis/PostgreSQL for integration testing.
         # Use readiness probes instead of sleep to avoid flaky failures on slow runners.
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rtmds
         run: |
-          docker compose -f deployments/docker-compose/docker-compose.yml up -d redis postgres
-          until docker compose -f deployments/docker-compose/docker-compose.yml exec -T postgres pg_isready -U postgres; do
+          docker compose -f deployments/docker-compose/docker-compose.yml up -d redis postgresql
+          until docker compose -f deployments/docker-compose/docker-compose.yml exec -T postgresql pg_isready -U postgres; do
             echo "Waiting for PostgreSQL..."; sleep 1;
           done
           until docker compose -f deployments/docker-compose/docker-compose.yml exec -T redis redis-cli ping | grep -q PONG; do

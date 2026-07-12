@@ -55,6 +55,10 @@ jobs:
 
       - name: Validate Docker Compose
         # Ensures that the docker-compose.yml is structurally valid and can parse env vars
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: rtmds
         run: docker compose -f deployments/docker-compose/docker-compose.yml config > /dev/null
 
       - name: Install kubeconform

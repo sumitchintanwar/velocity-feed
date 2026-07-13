@@ -17,10 +17,17 @@ func TestIntegration_HTTPGracefulDrain(t *testing.T) {
 
 	// 1. Create a slow HTTP handler
 	var activeRequests sync.WaitGroup
+	handlerEntered := make(chan struct{})
+	var handlerEnteredOnce sync.Once
+
 	mux := http.NewServeMux()
 	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
 		activeRequests.Add(1)
 		defer activeRequests.Done()
+		
+		handlerEnteredOnce.Do(func() {
+			close(handlerEntered)
+		})
 		
 		// Simulate a long 500ms database transaction
 		time.Sleep(500 * time.Millisecond)
@@ -69,8 +76,13 @@ func TestIntegration_HTTPGracefulDrain(t *testing.T) {
 		reqErrCh <- nil
 	}()
 
-	// Give the request 100ms to hit the handler and sleep
-	time.Sleep(100 * time.Millisecond)
+	// Wait until the request actually hits the handler, or timeout
+	select {
+	case <-handlerEntered:
+		// Perfect, the request is now safely in-flight
+	case <-time.After(3 * time.Second):
+		t.Fatalf("timed out waiting for request to reach handler")
+	}
 
 	// 3. Initiate Shutdown (while request is actively sleeping)
 	shutdownErrCh := make(chan error, 1)

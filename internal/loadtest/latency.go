@@ -67,7 +67,8 @@ func (lc *LatencyCollector) Record(d time.Duration) {
 	lc.total.Add(1)
 
 	// Sharded append: use goroutine ID or time-based hash to pick shard.
-	shard := int(uintptr(unsafe.Pointer(&d)) % _shardCount)
+	// Shift by 4 to eliminate alignment artifacts (Go stacks are aligned to 8/16 bytes).
+	shard := int((uintptr(unsafe.Pointer(&d)) >> 4) % _shardCount)
 	lc.shards[shard].mu.Lock()
 	lc.shards[shard].samples = append(lc.shards[shard].samples, d)
 	lc.shards[shard].mu.Unlock()

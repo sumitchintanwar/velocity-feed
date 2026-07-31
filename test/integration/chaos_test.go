@@ -12,8 +12,8 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sumit/rtmds/internal/distribution/redisbus"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // chaosSkipIfDocker skips if docker compose stack is not running.

@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/exchange"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/normalization"
-	sim "github.com/sumit/rtmds/internal/marketdata/simulator"
+	"github.com/sumit/rtmds/pkg/marketdata"
+	sim "github.com/sumit/rtmds/pkg/marketdata/simulator"
 )
 
 // Purpose: Adapts the existing marketdata simulator into the Exchange Adapter Framework.
@@ -83,10 +83,10 @@ func init() {
 		if val, ok := cfg.Custom["tick_interval_ms"].(float64); ok {
 			interval = time.Duration(val * float64(time.Millisecond))
 		}
-		
+
 		sCfg := sim.DefaultConfig()
 		sCfg.TickInterval = interval
-		
+
 		s, err := sim.New(sCfg, nil)
 		if err != nil {
 			return nil, err

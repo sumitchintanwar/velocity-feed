@@ -1,0 +1,2 @@
+Name,Duration(s),Clients,Msgs_Sent,Msgs_Recv,Dropped,Throughput(msg/s),Lat_Avg(ms),Lat_Median(ms),Lat_P95(ms),Lat_P99(ms),Lat_Max(ms),CPU,Mem(MB),Net(MB/s),Goroutines,GCPauses(s)
+Client Load Benchmark,10.91,1000,0,0,1000,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0.00,0,0.0000

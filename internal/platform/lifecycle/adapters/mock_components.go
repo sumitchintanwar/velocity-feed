@@ -14,7 +14,7 @@ type MockService struct {
 	StopDelay   time.Duration
 	StartErr    error
 	StopErr     error
-	
+
 	WasStarted bool
 	WasStopped bool
 }

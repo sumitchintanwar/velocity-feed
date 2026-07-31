@@ -2,12 +2,12 @@ package main
 
 import (
 	"fmt"
-	"time"
 	"os"
+	"time"
 
-	"github.com/sumit/rtmds/pkg/client"
 	"context"
 	"github.com/sumit/rtmds/internal/log"
+	"github.com/sumit/rtmds/pkg/client"
 )
 
 func main() {
@@ -18,7 +18,7 @@ func main() {
 
 	opts := client.DefaultOptions()
 	opts.InitialBackoff = 1 * time.Second
-	c, err := client.New("ws://localhost:8080/ws", opts)
+	c, err := client.Connect("ws://localhost:8080/ws", opts)
 	if err != nil {
 		log.Error(context.Background(), logger).Err(err).Msg("Failed to connect")
 		os.Exit(1)
@@ -32,8 +32,8 @@ func main() {
 	}
 
 	go func() {
-		for msg := range c.Messages() {
-			fmt.Printf("Received: %s\n", msg.Type)
+		for msg := range c.Receive() {
+			fmt.Printf("Received: %s\n", msg.EventType())
 		}
 		log.Info(context.Background(), logger).Msg("Message channel closed")
 	}()

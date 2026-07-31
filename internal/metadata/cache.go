@@ -33,7 +33,7 @@ func NewInstrumentCache() *InstrumentCache {
 // Pre-allocates map capacities based on the old data to reduce GC pressure.
 func (c *InstrumentCache) Replace(instruments []*Instrument) {
 	oldData := c.value.Load().(*cacheData)
-	
+
 	newBySymbol := make(map[string]*Instrument, len(oldData.bySymbol))
 	newByExchange := make(map[string][]*Instrument, len(oldData.byExchange))
 	newByAssetClass := make(map[AssetClass][]*Instrument, len(oldData.byAssetClass))

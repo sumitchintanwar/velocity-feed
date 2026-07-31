@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: rtmds-gateway
+  namespace: rtmds
+  labels:
+    app: rtmds
+    component: gateway
+spec:
+  type: LoadBalancer
+  selector:
+    app: rtmds
+    component: gateway
+  ports:
+  - name: http
+    port: 80
+    targetPort: 9090

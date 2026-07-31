@@ -275,9 +275,9 @@ func (r *Registry) heartbeatLoop(ctx context.Context, info GatewayInfo) {
 		case <-ticker.C:
 			// Deep health check: skip heartbeat if local gateway is unhealthy.
 			if r.isHealthy != nil && !r.isHealthy() {
-			r.log.Underlying().Warn().Str("id", info.ID).
-				Str("event", "heartbeat_skipped").
-				Msg("heartbeat: skipping — local health check failed")
+				r.log.Underlying().Warn().Str("id", info.ID).
+					Str("event", "heartbeat_skipped").
+					Msg("heartbeat: skipping — local health check failed")
 				continue
 			}
 

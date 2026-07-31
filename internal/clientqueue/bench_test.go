@@ -8,7 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/backpressure"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func benchEvent() marketdata.MarketEvent {
@@ -54,11 +54,11 @@ func BenchmarkQueue_DropNewest_Send(b *testing.B) {
 
 func BenchmarkQueue_Disconnect_Send(b *testing.B) {
 	cfg := Config{
-		QueueSize:            256,
-		Policy:               backpressure.PolicyDisconnect,
-		MaxConsecutiveDrops:  1000,
-		DropWindow:           time.Second,
-		DropThreshold:        0.9,
+		QueueSize:           256,
+		Policy:              backpressure.PolicyDisconnect,
+		MaxConsecutiveDrops: 1000,
+		DropWindow:          time.Second,
+		DropThreshold:       0.9,
 	}
 	reg := prometheus.NewRegistry()
 	q := New("bench", cfg, benchLogger(), reg, nil)

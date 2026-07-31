@@ -9,7 +9,7 @@ import (
 
 	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // mockRedisSub records Subscribe/Unsubscribe calls for verification.

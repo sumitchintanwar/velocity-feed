@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/go-chi/chi/v5"
+	chimw "github.com/go-chi/chi/v5/middleware"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sumit/rtmds/internal/config"
@@ -56,6 +57,7 @@ type LogLevelChanger interface {
 //	GET  /replay/export   bulk export of historical events (CSV/JSON)
 //	GET  /metrics         Prometheus scrape endpoint (if enabled)
 //	GET  /gateways        list active gateways (if discovery enabled)
+//	GET  /debug/pprof/*   Go profiling endpoints (CPU, Heap, Mutex, etc)
 //	POST /admin/log-level change log level at runtime (incident response)
 func NewRouter(
 	cfg *config.Config,
@@ -68,6 +70,7 @@ func NewRouter(
 	eventLog eventlog.Repository,
 	healthRegistry *healthcheck.Registry,
 	heartbeat *healthcheck.Heartbeat,
+	gwHealth *ws.HealthMonitor,
 	logChanger LogLevelChanger,
 ) http.Handler {
 	r := chi.NewRouter()
@@ -80,7 +83,10 @@ func NewRouter(
 	}
 
 	// Gateway ID for sticky session verification
-	gatewayID := gw.ID()
+	var gatewayID string
+	if gw != nil {
+		gatewayID = gw.ID()
+	}
 
 	// --- Routes ---
 	r.Get("/", handleRoot())
@@ -89,7 +95,14 @@ func NewRouter(
 	r.Get("/ready", handleReady(healthReporter, gatewayID))
 	r.Get("/liveness", handleLiveness(healthRegistry, heartbeat, gatewayID))
 	r.Get("/readiness", handleReadiness(healthRegistry, gatewayID))
-	r.Get("/ws", gw.Handler())
+	r.Get("/health/gateway", handleGatewayHealth(gwHealth))
+	
+	if gw != nil {
+		r.Get("/ws", gw.Handler())
+	}
+
+	// Expose pprof profiling endpoints under /debug
+	r.Mount("/debug", chimw.Profiler())
 
 	if eventLog != nil {
 		limiter := newConcurrencyLimiter(maxConcurrentQueriesPerClient)
@@ -214,6 +227,19 @@ func handleHealth(_ HealthReporter, gatewayID string) http.HandlerFunc {
 	}
 }
 
+// handleGatewayHealth returns the WebSocket gateway's internal health metrics.
+func handleGatewayHealth(hm *ws.HealthMonitor) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if hm == nil {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		stats := hm.Check()
+		w.Header().Set("Content-Type", "application/json")
+		_ = json.NewEncoder(w).Encode(stats)
+	}
+}
+
 // handleHealthDetail returns detailed health status of all components.
 // Sets rtmds-gateway-id header for sticky session verification.
 func handleHealthDetail(reporter HealthReporter, gatewayID string) http.HandlerFunc {
@@ -324,16 +350,16 @@ func handleReadiness(registry *healthcheck.Registry, gatewayID string) http.Hand
 		if result.Status != "ok" {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_ = json.NewEncoder(w).Encode(map[string]interface{}{
-				"status":  "not_ready",
-				"checks":  result.Checks,
+				"status":   "not_ready",
+				"checks":   result.Checks,
 				"duration": result.Duration.Milliseconds(),
 			})
 			return
 		}
 
 		_ = json.NewEncoder(w).Encode(map[string]interface{}{
-			"status":  "ready",
-			"checks":  result.Checks,
+			"status":   "ready",
+			"checks":   result.Checks,
 			"duration": result.Duration.Milliseconds(),
 		})
 	}

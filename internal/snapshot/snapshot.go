@@ -27,9 +27,9 @@ import (
 
 	"github.com/sumit/rtmds/internal/eventlog"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/pubsub"
 	"github.com/sumit/rtmds/internal/tracing"
+	"github.com/sumit/rtmds/pkg/marketdata"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -328,6 +328,13 @@ func (s *Service) UpdateCursor(cursor eventlog.Cursor) {
 	s.mu.Unlock()
 }
 
+// LastCursor returns the most recent cursor state.
+func (s *Service) LastCursor() eventlog.Cursor {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	return s.lastCursor
+}
+
 // Get returns the latest cached event for a symbol, or nil if no snapshot
 // exists or the service is warming up. Thread-safe.
 //
@@ -521,9 +528,9 @@ func (s *Service) LoadCheckpoint() error {
 		err := s.loadCheckpointFrom(path)
 		if err == nil {
 			if i == 1 {
-			s.log.Underlying().Warn().Str("path", path).
-				Str("event", "checkpoint_fallback_loaded").
-				Msg("snapshot-service: loaded fallback checkpoint (current was corrupted)")
+				s.log.Underlying().Warn().Str("path", path).
+					Str("event", "checkpoint_fallback_loaded").
+					Msg("snapshot-service: loaded fallback checkpoint (current was corrupted)")
 			}
 			return nil
 		}

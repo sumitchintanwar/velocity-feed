@@ -3,7 +3,7 @@ package normalization
 import (
 	"fmt"
 
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Rule defines a single validation check for a quote.

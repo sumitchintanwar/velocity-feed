@@ -18,6 +18,7 @@ const (
 
 // Context keys
 type contextKey string
+
 const (
 	userContextKey contextKey = "user_identity"
 	roleContextKey contextKey = "user_role"
@@ -84,7 +85,7 @@ func RequireRole(required Role) func(http.Handler) http.Handler {
 			}
 
 			actualRole := roleVal.(Role)
-			
+
 			if !isAuthorized(actualRole, required) {
 				http.Error(w, `{"error": "forbidden: insufficient permissions"}`, http.StatusForbidden)
 				return

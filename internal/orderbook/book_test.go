@@ -72,7 +72,7 @@ func TestOrderBookUpdateAndDelete(t *testing.T) {
 	if book.Bids[0].Quantity != 5.0 {
 		t.Errorf("Expected bid quantity 5.0, got %f", book.Bids[0].Quantity)
 	}
-	
+
 	if len(book.Asks) != 1 || book.Asks[0].Price != 101.0 {
 		t.Errorf("Expected 1 ask at 101.0, got %v", book.Asks)
 	}
@@ -219,7 +219,7 @@ func TestConcurrentClients(t *testing.T) {
 	}
 
 	done := make(chan bool)
-	
+
 	// Spawn 100 writers
 	for i := 0; i < 100; i++ {
 		go func(writerID int) {

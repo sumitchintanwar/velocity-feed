@@ -14,7 +14,7 @@ func TestAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to get factory: %v", err)
 	}
-	
+
 	adapter, err := factory(exchange.AdapterConfig{
 		Custom: map[string]interface{}{
 			"tick_interval_ms": 10.0,
@@ -23,23 +23,23 @@ func TestAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to create adapter: %v", err)
 	}
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
 	defer cancel()
-	
+
 	if err := adapter.Connect(ctx); err != nil {
 		t.Fatalf("connect failed: %v", err)
 	}
-	
+
 	if err := adapter.Subscribe("AAPL"); err != nil {
 		t.Fatalf("subscribe failed: %v", err)
 	}
-	
+
 	ch, err := adapter.Run(ctx)
 	if err != nil {
 		t.Fatalf("run failed: %v", err)
 	}
-	
+
 	select {
 	case q := <-ch:
 		if q.Provider != "simulator" {
@@ -57,14 +57,14 @@ func BenchmarkAdapter(b *testing.B) {
 			"tick_interval_ms": 0.001, // 1 microsecond
 		},
 	})
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	
+
 	adapter.Connect(ctx)
 	adapter.Subscribe("AAPL", "MSFT", "GOOG")
 	ch, _ := adapter.Run(ctx)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		<-ch

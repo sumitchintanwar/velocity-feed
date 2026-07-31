@@ -16,10 +16,10 @@ const _shardCount = 16
 // Uses sharded storage to minimize lock contention at high connection counts.
 type LatencyCollector struct {
 	// Aggregate stats via atomics (no lock needed for Record).
-	min    atomic.Int64 // nanoseconds, initialized to MaxInt64
-	max    atomic.Int64 // nanoseconds
-	sum    atomic.Int64 // nanoseconds
-	total  atomic.Int64
+	min   atomic.Int64 // nanoseconds, initialized to MaxInt64
+	max   atomic.Int64 // nanoseconds
+	sum   atomic.Int64 // nanoseconds
+	total atomic.Int64
 
 	// Sharded sample storage for percentile computation.
 	shards [_shardCount]struct {

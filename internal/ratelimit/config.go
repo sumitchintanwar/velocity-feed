@@ -96,8 +96,8 @@ func (c Config) unsubscribeBucket() *Bucket {
 // Useful for tests or internal clients.
 func NoLimits() Config {
 	return Config{
-		Connect:   RateLimit{Rate: 1e6, Burst: 1e6},
-		Subscribe: RateLimit{Rate: 1e6, Burst: 1e6},
+		Connect:     RateLimit{Rate: 1e6, Burst: 1e6},
+		Subscribe:   RateLimit{Rate: 1e6, Burst: 1e6},
 		Unsubscribe: RateLimit{Rate: 1e6, Burst: 1e6},
 	}
 }

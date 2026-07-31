@@ -13,7 +13,7 @@ import (
 	"github.com/sumit/rtmds/internal/platform/admin/commands"
 	"github.com/sumit/rtmds/internal/platform/admin/middleware"
 	"github.com/sumit/rtmds/internal/platform/lifecycle"
-	
+
 	"go.uber.org/zap"
 )
 
@@ -21,9 +21,10 @@ import (
 type mockComponent struct {
 	name string
 }
-func (m *mockComponent) Name() string { return m.name }
+
+func (m *mockComponent) Name() string                    { return m.name }
 func (m *mockComponent) Start(ctx context.Context) error { return nil }
-func (m *mockComponent) Stop(ctx context.Context) error { return nil }
+func (m *mockComponent) Stop(ctx context.Context) error  { return nil }
 
 func setupQAServer() (*http.ServeMux, *commands.MockPublisherController, *commands.MockMaintenanceController) {
 	manager := lifecycle.NewManager()
@@ -35,8 +36,8 @@ func setupQAServer() (*http.ServeMux, *commands.MockPublisherController, *comman
 	maintCtrl := &commands.MockMaintenanceController{}
 
 	cfg := api.RouterConfig{
-		Manager:               manager,
-		Version:               "1.0.0",
+		Manager: manager,
+		Version: "1.0.0",
 		Authenticator: &middleware.StaticTokenAuthenticator{
 			AdminToken:    "admin",
 			OperatorToken: "operator",
@@ -76,7 +77,7 @@ func TestQA_Inspection(t *testing.T) {
 // 2.2 Diagnostics
 func TestQA_Diagnostics(t *testing.T) {
 	router, _, _ := setupQAServer()
-	
+
 	req := httptest.NewRequest("GET", "/diagnostics/goroutines", nil)
 	req.Header.Set("Authorization", "Bearer viewer")
 	rr := httptest.NewRecorder()
@@ -135,11 +136,11 @@ func TestQA_Concurrency(t *testing.T) {
 	for i := 0; i < requests; i++ {
 		go func() {
 			defer wg.Done()
-			
+
 			creq := httptest.NewRequest("POST", "/operations/maintenance/enable", nil)
 			creq.Header.Set("Authorization", "Bearer operator")
 			crr := httptest.NewRecorder()
-			
+
 			router.ServeHTTP(crr, creq)
 
 			if crr.Code == http.StatusOK {
@@ -155,7 +156,7 @@ func TestQA_Concurrency(t *testing.T) {
 	if successCount != 1 {
 		t.Errorf("expected exactly 1 success, got %d", successCount)
 	}
-	
+
 	if conflictCount != int32(requests-1) {
 		t.Errorf("expected exactly %d conflicts, got %d", requests-1, conflictCount)
 	}

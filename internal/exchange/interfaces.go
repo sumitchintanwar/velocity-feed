@@ -3,8 +3,8 @@ package exchange
 import (
 	"context"
 
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/normalization"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Purpose: Defines the contract between the Exchange Adapter Framework and specific exchange implementations.
@@ -20,7 +20,7 @@ type ExchangeAdapter interface {
 	// Connect establishes the underlying transport connection to the exchange.
 	// It should block until the connection is established or the context is cancelled.
 	Connect(ctx context.Context) error
-	
+
 	// Disconnect cleanly tears down the underlying connection.
 	Disconnect(ctx context.Context) error
 

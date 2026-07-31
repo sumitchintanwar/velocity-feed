@@ -1,0 +1,19 @@
+{
+  "name": "Publisher Load Benchmark",
+  "duration": 15001528400,
+  "clients": 0,
+  "messages_sent": 68756,
+  "messages_received": 0,
+  "dropped": 0,
+  "throughput_msg_per_sec": 4583.266329049512,
+  "latency_avg": 2169280,
+  "latency_median": 1610700,
+  "latency_p95": 5195700,
+  "latency_p99": 13160500,
+  "latency_max": 164987300,
+  "cpu_cores": 0,
+  "memory_mb": 0,
+  "network_bandwidth_mb_per_sec": 0.43709433832640765,
+  "go_routines": 0,
+  "gc_pauses": 0
+}

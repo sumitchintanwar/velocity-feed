@@ -17,8 +17,8 @@ type CommandFactory func(payload map[string]interface{}) (Command, error)
 
 // CommandBus routes and executes commands.
 type CommandBus struct {
-	mu         sync.RWMutex
-	factories  map[string]CommandFactory
+	mu        sync.RWMutex
+	factories map[string]CommandFactory
 }
 
 func NewCommandBus() *CommandBus {

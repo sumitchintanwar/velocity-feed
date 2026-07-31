@@ -29,6 +29,8 @@ import (
 
 	"github.com/sumit/rtmds/internal/app"
 	"github.com/sumit/rtmds/internal/config"
+	"github.com/sumit/rtmds/pkg/marketdata"
+	"github.com/sumit/rtmds/pkg/protocol"
 
 	// Register exchange adapters
 	_ "github.com/sumit/rtmds/internal/adapters/crypto"
@@ -57,6 +59,11 @@ func main() {
 	}
 
 	// ── 3. Build application (wire dependencies) ────────────────
+	
+	// Inject serializers into marketdata package for zero-copy broadcasting
+	marketdata.ProtobufEncoder = protocol.NewProtobufSerializer()
+	marketdata.FlatBuffersEncoder = protocol.NewFlatBuffersSerializer()
+
 	application, err := app.New(cfg)
 	if err != nil {
 		_, _ = os.Stderr.WriteString(fmt.Sprintf("app build error: %v\n", err))

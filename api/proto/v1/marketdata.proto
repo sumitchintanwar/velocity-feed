@@ -1,0 +1,98 @@
+syntax = "proto3";
+
+package rtmds.marketdata.v1;
+
+option go_package = "github.com/sumit/rtmds/api/proto/v1;marketdata";
+
+// Side represents the side of a market event.
+enum Side {
+  SIDE_UNSPECIFIED = 0;
+  SIDE_BUY = 1;
+  SIDE_SELL = 2;
+}
+
+// MarketEvent is the top-level envelope for all streaming messages over WebSocket.
+// It wraps specific event payloads.
+message MarketEvent {
+  // The ticker symbol this event belongs to (e.g., "AAPL")
+  string symbol = 1;
+  // Event generation timestamp in Unix milliseconds
+  int64 timestamp = 2;
+  // Global sequence number for the stream (useful for gap detection without decoding the payload)
+  uint64 sequence_number = 3;
+  
+  // The specific event payload
+  oneof payload {
+    Tick tick = 4;
+    OrderBookUpdate order_book_update = 5;
+    Heartbeat heartbeat = 6;
+    Snapshot snapshot = 7;
+    ReplayResponse replay_response = 8;
+  }
+  
+  // Reserve space for future envelope metadata (e.g., tracing IDs)
+  reserved 9 to 15;
+}
+
+// Tick represents a single trade execution or quote update.
+message Tick {
+  double price = 1;
+  double volume = 2;
+  Side side = 3; 
+  // Optional exchange identifier where the tick occurred
+  string exchange = 4; 
+  // Optional unique trade/tick identifier
+  string trade_id = 5;
+  
+  // Reserved fields to prevent accidental reuse in the future
+  reserved 6 to 10;
+}
+
+// Level represents a single price level in an order book.
+// We keep this as a message rather than flat struct to allow extensibility (e.g., adding order_count)
+message Level {
+  double price = 1;
+  double volume = 2;
+}
+
+// OrderBookUpdate represents a change to the L2/L3 order book.
+message OrderBookUpdate {
+  repeated Level bids = 1;
+  repeated Level asks = 2;
+  // If true, this message represents the full book state rather than a delta update
+  bool is_snapshot = 3; 
+  
+  reserved 4 to 10;
+}
+
+// Heartbeat represents a connection keep-alive or sequence marker.
+message Heartbeat {
+  // Empty, sequence_number moved to the MarketEvent envelope
+}
+
+// Snapshot represents a summary of current market conditions.
+message Snapshot {
+  double last_price = 1;
+  double last_volume = 2;
+  double high = 3;
+  double low = 4;
+  double open = 5;
+  double close = 6;
+  
+  // Optional full order book snapshot attached to the summary
+  OrderBookUpdate order_book = 7; 
+  
+  reserved 8 to 15;
+}
+
+// ReplayResponse indicates the status of a historical data replay request.
+message ReplayResponse {
+  // True if this is the final message of the replay session
+  bool is_complete = 1; 
+  // The starting sequence number of the replay chunk
+  uint64 start_sequence = 2;
+  // The ending sequence number of the replay chunk
+  uint64 end_sequence = 3;
+  
+  reserved 4 to 10;
+}

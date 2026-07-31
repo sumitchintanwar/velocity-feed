@@ -35,13 +35,13 @@ type Config struct {
 // DefaultConfig returns a Config with sensible defaults.
 func DefaultConfig() Config {
 	return Config{
-		ServerURL:       "ws://localhost:8080/ws",
-		Connections:     100,
-		Symbols:         []string{"AAPL", "MSFT", "GOOG", "TSLA", "NVDA"},
-		Duration:        30 * time.Second,
-		RampUp:          0,
-		ReadDelay:       0,
-		ReportInterval:  5 * time.Second,
+		ServerURL:      "ws://localhost:8080/ws",
+		Connections:    100,
+		Symbols:        []string{"AAPL", "MSFT", "GOOG", "TSLA", "NVDA"},
+		Duration:       30 * time.Second,
+		RampUp:         0,
+		ReadDelay:      0,
+		ReportInterval: 5 * time.Second,
 	}
 }
 

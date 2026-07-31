@@ -21,16 +21,16 @@ type Validator interface {
 // Experiment defines the lifecycle of a chaos engineering fault injection.
 type Experiment interface {
 	Name() string
-	
+
 	// Setup prepares the environment for the experiment.
 	Setup(ctx context.Context) error
-	
+
 	// InjectFault triggers the failure condition (e.g., stopping a container).
 	InjectFault(ctx context.Context) error
-	
+
 	// Validate executes all provided validators to ensure the system behaved correctly during the fault.
 	Validate(ctx context.Context, validators []Validator) []ValidationResult
-	
+
 	// Teardown MUST restore the environment to a healthy state, even if earlier steps panicked.
 	Teardown(ctx context.Context) error
 }

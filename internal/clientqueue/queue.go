@@ -21,7 +21,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/backpressure"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Queue is a per-client bounded event queue backed by a backpressure.Channel.
@@ -227,7 +227,7 @@ const defaultManagerShards = 16
 // managerShard protects a disjoint subset of client queues.
 // Reduces contention on the global map during market-open storms.
 type managerShard struct {
-	mu    sync.RWMutex
+	mu     sync.RWMutex
 	queues map[string]*Queue
 }
 
@@ -346,12 +346,12 @@ func (m *Manager) Snapshot() []string {
 
 // ClientStats holds per-client statistics without Prometheus labels.
 type ClientStats struct {
-	ID           string
-	Enqueued     uint64
-	Sent         uint64
-	Dropped      uint64
-	Depth        int
-	Consecutive  int64
+	ID          string
+	Enqueued    uint64
+	Sent        uint64
+	Dropped     uint64
+	Depth       int
+	Consecutive int64
 }
 
 // PerClientStats returns per-client statistics for all active queues.

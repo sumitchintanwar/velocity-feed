@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 type benchMapper struct{}

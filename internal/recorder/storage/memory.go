@@ -53,8 +53,8 @@ func (s *InMemoryStore) ReadStream(ctx context.Context, symbol string, start, en
 
 	var results []models.StoredEvent
 	for _, ev := range partition {
-		if (ev.Timestamp.Equal(start) || ev.Timestamp.After(start)) && 
-		   (ev.Timestamp.Equal(end) || ev.Timestamp.Before(end)) {
+		if (ev.Timestamp.Equal(start) || ev.Timestamp.After(start)) &&
+			(ev.Timestamp.Equal(end) || ev.Timestamp.Before(end)) {
 			results = append(results, ev)
 		}
 	}
@@ -97,4 +97,3 @@ func (m *memoryIterator) Close() error {
 	m.events = nil
 	return nil
 }
-

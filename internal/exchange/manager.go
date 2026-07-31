@@ -7,8 +7,8 @@ import (
 	"sync"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/normalization"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Purpose: Orchestrates the lifecycle of all enabled adapters.
@@ -96,7 +96,7 @@ func (m *Manager) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 
 	for i, adapter := range m.adapters {
 		cfg := m.configs[i]
-		
+
 		// 1. Connect
 		if err := adapter.Connect(ctx); err != nil {
 			m.logger.Underlying().Error().Err(err).Str("adapter", adapter.Name()).Msg("Failed to connect adapter")
@@ -130,7 +130,7 @@ func (m *Manager) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 		go func(a ExchangeAdapter, q <-chan marketdata.RawMessage, p *normalization.Pipeline) {
 			defer m.wg.Done()
 			m.logger.Underlying().Info().Str("adapter", a.Name()).Msg("Adapter streaming started")
-			
+
 			for {
 				select {
 				case raw, ok := <-q:
@@ -138,7 +138,7 @@ func (m *Manager) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 						m.logger.Underlying().Info().Str("adapter", a.Name()).Msg("Adapter channel closed")
 						return
 					}
-					
+
 					// Normalize
 					quote, err := p.Normalize(raw)
 					if err != nil {

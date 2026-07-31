@@ -10,7 +10,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/backpressure"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 const (
@@ -197,11 +197,11 @@ func TestLoad_DisconnectedClient(t *testing.T) {
 	var disconnectReason atomic.Value
 
 	cfg := Config{
-		QueueSize:            64,
-		Policy:               backpressure.PolicyDisconnect,
-		MaxConsecutiveDrops:  20,
-		DropWindow:           time.Second,
-		DropThreshold:        0.8,
+		QueueSize:           64,
+		Policy:              backpressure.PolicyDisconnect,
+		MaxConsecutiveDrops: 20,
+		DropWindow:          time.Second,
+		DropThreshold:       0.8,
 	}
 	reg := prometheus.NewPedanticRegistry()
 	q := New("disconnected-client", cfg, loadLogger(), reg, func(reason string) {
@@ -298,11 +298,11 @@ func TestLoad_MixedClients(t *testing.T) {
 
 	// Disconnected client: should be disconnected.
 	discQ := New("disconnected", Config{
-		QueueSize:            32,
-		Policy:               backpressure.PolicyDisconnect,
-		MaxConsecutiveDrops:  10,
-		DropWindow:           time.Second,
-		DropThreshold:        0.8,
+		QueueSize:           32,
+		Policy:              backpressure.PolicyDisconnect,
+		MaxConsecutiveDrops: 10,
+		DropWindow:          time.Second,
+		DropThreshold:       0.8,
 	}, loadLogger(), prometheus.NewPedanticRegistry(), func(reason string) {
 		disconnected.Store(true)
 	})

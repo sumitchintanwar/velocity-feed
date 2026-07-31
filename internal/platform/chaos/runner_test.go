@@ -15,7 +15,7 @@ type mockExperiment struct {
 	setupErr    error
 	injectErr   error
 	teardownErr error
-	
+
 	setupCalled    bool
 	injectCalled   bool
 	teardownCalled bool
@@ -43,6 +43,7 @@ type mockValidator struct {
 	success bool
 	count   int
 }
+
 func (m *mockValidator) Name() string { return "Mock Validator" }
 func (m *mockValidator) Assert(ctx context.Context) (chaos.ValidationResult, error) {
 	m.count++
@@ -76,7 +77,7 @@ func TestRunner_RunSuite(t *testing.T) {
 			t.Errorf("expected experiment %s to pass", res.ExperimentName)
 		}
 	}
-	
+
 	if !exp1.teardownCalled || !exp2.teardownCalled {
 		t.Error("expected all experiments to be torn down")
 	}
@@ -94,7 +95,7 @@ func TestRunner_PollingValidationFailure(t *testing.T) {
 	// We'll run it directly to check failure state is captured correctly if run fails
 	// In reality we should make the timeout configurable on the Runner for tests.
 	// For this test, we just assume the context is cancelled early.
-	
+
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 

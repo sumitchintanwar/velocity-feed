@@ -12,7 +12,7 @@ import (
 
 	"github.com/sumit/rtmds/internal/eventlog"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func TestService_UpdateAndGet(t *testing.T) {

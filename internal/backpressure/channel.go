@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Channel is a configurable backpressure buffer that wraps a Go channel
@@ -154,7 +154,7 @@ func (c *Channel) sendDropOldest(ev marketdata.MarketEvent) bool {
 	if newDropped > prevDropped {
 		dropped := newDropped - prevDropped
 		c.totalDropped.Add(dropped)
-		c.metrics.EventsDroppedTotal.Add(float64(dropped))
+		c.metrics.DroppedMessagesTotal.Add(float64(dropped))
 	} else {
 		c.resetConsecutiveOnSuccess()
 	}
@@ -172,7 +172,7 @@ func (c *Channel) sendDropNewest(ev marketdata.MarketEvent) bool {
 		return false
 	default:
 		c.totalDropped.Add(1)
-		c.metrics.EventsDroppedTotal.Inc()
+		c.metrics.DroppedMessagesTotal.Inc()
 		c.recordDrop()
 		return false
 	}
@@ -189,7 +189,7 @@ func (c *Channel) sendDisconnect(ev marketdata.MarketEvent) bool {
 
 	if newDropped > prevDropped {
 		c.totalDropped.Add(newDropped - prevDropped)
-		c.metrics.EventsDroppedTotal.Add(float64(newDropped - prevDropped))
+		c.metrics.DroppedMessagesTotal.Add(float64(newDropped - prevDropped))
 		c.recordDrop()
 	} else {
 		c.resetConsecutiveOnSuccess()
@@ -330,7 +330,7 @@ func (c *Channel) Close() {
 				case c.forwardC <- ev:
 				default:
 					c.totalDropped.Add(1)
-					c.metrics.EventsDroppedTotal.Inc()
+					c.metrics.DroppedMessagesTotal.Inc()
 				}
 			}
 		}
@@ -427,7 +427,7 @@ func (c *CachedChannel) sendDropOldest(ev *marketdata.CachedEvent) bool {
 	if newDropped > prevDropped {
 		dropped := newDropped - prevDropped
 		c.totalDropped.Add(dropped)
-		c.metrics.EventsDroppedTotal.Add(float64(dropped))
+		c.metrics.DroppedMessagesTotal.Add(float64(dropped))
 	} else {
 		c.resetConsecutiveOnSuccess()
 	}
@@ -444,7 +444,7 @@ func (c *CachedChannel) sendDropNewest(ev *marketdata.CachedEvent) bool {
 		return false
 	default:
 		c.totalDropped.Add(1)
-		c.metrics.EventsDroppedTotal.Inc()
+		c.metrics.DroppedMessagesTotal.Inc()
 		c.recordDrop()
 		return false
 	}
@@ -459,7 +459,7 @@ func (c *CachedChannel) sendDisconnect(ev *marketdata.CachedEvent) bool {
 	}
 	if newDropped > prevDropped {
 		c.totalDropped.Add(newDropped - prevDropped)
-		c.metrics.EventsDroppedTotal.Add(float64(newDropped - prevDropped))
+		c.metrics.DroppedMessagesTotal.Add(float64(newDropped - prevDropped))
 		c.recordDrop()
 	} else {
 		c.resetConsecutiveOnSuccess()
@@ -513,18 +513,13 @@ func (c *CachedChannel) forwardLoop() {
 		if !ok {
 			continue
 		}
-		// Non-blocking send: if the consumer channel is full, drop the event
-		// rather than stalling the ring drain. This prevents the publisher from
-		// seeing a full ring and blocking on Push — critical for maintaining
-		// throughput when consumers are slow.
+		// Block until the consumer reads or shutdown.
+		// Blocking here forces the ring buffer to overflow and correctly apply
+		// the DropOldest policy, rather than instantly draining the entire ring.
 		select {
 		case c.forwardC <- ev:
 		case <-c.stopCh:
 			return
-		default:
-			// Consumer channel full — drop to keep pipeline flowing.
-			c.totalDropped.Add(1)
-			c.metrics.EventsDroppedTotal.Inc()
 		}
 	}
 }
@@ -586,7 +581,7 @@ func (c *CachedChannel) Close() {
 				case c.forwardC <- ev:
 				default:
 					c.totalDropped.Add(1)
-					c.metrics.EventsDroppedTotal.Inc()
+					c.metrics.DroppedMessagesTotal.Inc()
 				}
 			}
 		}

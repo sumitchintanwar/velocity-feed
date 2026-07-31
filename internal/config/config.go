@@ -56,10 +56,10 @@ type ServerConfig struct {
 
 // RedisConfig holds connection details for the Redis pub/sub broker.
 type RedisConfig struct {
-	Enabled  bool          `mapstructure:"enabled"`
-	Addr     string        `mapstructure:"addr"`
-	Password SecretString  `mapstructure:"password"`
-	DB       int           `mapstructure:"db"`
+	Enabled  bool         `mapstructure:"enabled"`
+	Addr     string       `mapstructure:"addr"`
+	Password SecretString `mapstructure:"password"`
+	DB       int          `mapstructure:"db"`
 }
 
 // FeedConfig holds settings for upstream market-data feed providers.
@@ -211,25 +211,25 @@ func Load(cfgFile string) (*Config, error) {
 	v.SetDefault("feed.reconnect_delay", "5s")
 	v.SetDefault("feed.tick_interval", "0s") // 0 = use simulator default
 	v.SetDefault("feed.benchmark_mode", false)
-	
+
 	v.SetDefault("exchange.adapters", []map[string]interface{}{
 		{
-			"name": "simulator",
+			"name":    "simulator",
 			"enabled": true,
 			"symbols": []string{"AAPL", "MSFT", "GOOG", "AMZN", "TSLA"},
 		},
 		{
-			"name": "nasdaq",
+			"name":    "nasdaq",
 			"enabled": true,
 			"symbols": []string{"META", "NFLX"},
 		},
 		{
-			"name": "nyse",
+			"name":    "nyse",
 			"enabled": true,
 			"symbols": []string{"IBM", "JPM"},
 		},
 		{
-			"name": "crypto",
+			"name":    "crypto",
 			"enabled": true,
 			"symbols": []string{"BTC-USD", "ETH-USD"},
 		},
@@ -569,10 +569,10 @@ func (s ServerConfig) GetGatewayID() string {
 func (c *Config) Summary() map[string]interface{} {
 	return map[string]interface{}{
 		"server": map[string]interface{}{
-			"host":            c.Server.Host,
-			"port":            c.Server.Port,
-			"read_timeout":    c.Server.ReadTimeout,
-			"write_timeout":   c.Server.WriteTimeout,
+			"host":             c.Server.Host,
+			"port":             c.Server.Port,
+			"read_timeout":     c.Server.ReadTimeout,
+			"write_timeout":    c.Server.WriteTimeout,
 			"shutdown_timeout": c.Server.ShutdownTimeout,
 		},
 		"redis": map[string]interface{}{
@@ -581,30 +581,30 @@ func (c *Config) Summary() map[string]interface{} {
 			"db":      c.Redis.DB,
 		},
 		"feed": map[string]interface{}{
-			"enabled":         c.Feed.Enabled,
-			"symbols":         c.Feed.Symbols,
-			"benchmark_mode":  c.Feed.BenchmarkMode,
-			"tick_interval":   c.Feed.TickInterval,
+			"enabled":        c.Feed.Enabled,
+			"symbols":        c.Feed.Symbols,
+			"benchmark_mode": c.Feed.BenchmarkMode,
+			"tick_interval":  c.Feed.TickInterval,
 		},
 		"log": map[string]interface{}{
 			"level":  c.Log.Level,
 			"format": c.Log.Format,
 		},
 		"database": map[string]interface{}{
-			"enabled":         c.Database.Enabled,
-			"host":            c.Database.Host,
-			"port":            c.Database.Port,
-			"user":            c.Database.User,
-			"dbname":          c.Database.DBName,
-			"sslmode":         c.Database.SSLMode,
-			"max_open_conns":  c.Database.MaxOpenConns,
-			"max_idle_conns":  c.Database.MaxIdleConns,
+			"enabled":        c.Database.Enabled,
+			"host":           c.Database.Host,
+			"port":           c.Database.Port,
+			"user":           c.Database.User,
+			"dbname":         c.Database.DBName,
+			"sslmode":        c.Database.SSLMode,
+			"max_open_conns": c.Database.MaxOpenConns,
+			"max_idle_conns": c.Database.MaxIdleConns,
 		},
 		"snapshot": map[string]interface{}{
-			"enabled":           c.Snapshot.Enabled,
-			"checkpoint_path":   c.Snapshot.CheckpointPath,
+			"enabled":             c.Snapshot.Enabled,
+			"checkpoint_path":     c.Snapshot.CheckpointPath,
 			"checkpoint_interval": c.Snapshot.CheckpointInterval,
-			"max_age":           c.Snapshot.MaxAge,
+			"max_age":             c.Snapshot.MaxAge,
 		},
 		"discovery": map[string]interface{}{
 			"enabled":            c.Discovery.Enabled,

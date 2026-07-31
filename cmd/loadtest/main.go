@@ -37,13 +37,13 @@ func main() {
 	flag.Parse()
 
 	cfg := loadtest.Config{
-		ServerURL:       url,
-		Connections:     connections,
-		Symbols:         strings.Split(symbols, ","),
-		Duration:        duration,
-		RampUp:          rampUp,
-		ReadDelay:       readDelay,
-		ReportInterval:  reportEvery,
+		ServerURL:      url,
+		Connections:    connections,
+		Symbols:        strings.Split(symbols, ","),
+		Duration:       duration,
+		RampUp:         rampUp,
+		ReadDelay:      readDelay,
+		ReportInterval: reportEvery,
 	}
 
 	fmt.Printf("Load Test Configuration:\n")

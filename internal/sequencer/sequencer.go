@@ -32,12 +32,12 @@ type entry struct {
 // Sequencer is an in-memory Generator with TTL-based eviction.
 // Safe for concurrent use. Sequences start at 1 by default.
 type Sequencer struct {
-	mu       sync.Mutex
-	seqs     map[string]entry // symbol → entry
-	start    int64            // initial sequence value (default 1)
-	ttl      time.Duration    // how long a symbol's entry lives after last access
-	lastEvict time.Time       // last time eviction ran
-	evictInt time.Duration   // interval between eviction sweeps
+	mu        sync.Mutex
+	seqs      map[string]entry // symbol → entry
+	start     int64            // initial sequence value (default 1)
+	ttl       time.Duration    // how long a symbol's entry lives after last access
+	lastEvict time.Time        // last time eviction ran
+	evictInt  time.Duration    // interval between eviction sweeps
 }
 
 // Option configures the in-memory Sequencer.

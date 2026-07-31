@@ -8,7 +8,7 @@ import (
 
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // testMetrics creates a Metrics instance backed by an isolated registry.
@@ -505,10 +505,10 @@ func TestMetrics_EventsDroppedTotal(t *testing.T) {
 		t.Fatalf("Gather: %v", err)
 	}
 	for _, mf := range gathered {
-		if mf.GetName() == "rtmds_backpressure_events_dropped_total" {
+		if mf.GetName() == "rtmds_backpressure_dropped_messages_total" {
 			for _, m := range mf.GetMetric() {
 				if m.GetCounter().GetValue() < 1 {
-					t.Error("expected EventsDroppedTotal >= 1")
+					t.Error("expected DroppedMessagesTotal >= 1")
 				}
 			}
 			return

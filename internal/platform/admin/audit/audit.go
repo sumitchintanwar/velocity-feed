@@ -18,16 +18,16 @@ const (
 
 // Event represents a single, immutable audit log entry.
 type Event struct {
-	Timestamp     time.Time `json:"timestamp"`
-	UserIdentity  string    `json:"user_identity"`
-	SourceIP      string    `json:"source_ip"`
-	RequestID     string    `json:"request_id"`
-	CorrelationID string    `json:"correlation_id"`
-	Action        string    `json:"action"`
-	TargetService string    `json:"target_service"`
-	Outcome       Outcome   `json:"outcome"`
+	Timestamp     time.Time     `json:"timestamp"`
+	UserIdentity  string        `json:"user_identity"`
+	SourceIP      string        `json:"source_ip"`
+	RequestID     string        `json:"request_id"`
+	CorrelationID string        `json:"correlation_id"`
+	Action        string        `json:"action"`
+	TargetService string        `json:"target_service"`
+	Outcome       Outcome       `json:"outcome"`
 	Duration      time.Duration `json:"duration"`
-	ErrorMessage  string    `json:"error_message,omitempty"`
+	ErrorMessage  string        `json:"error_message,omitempty"`
 }
 
 // Logger defines the interface for recording audit events.

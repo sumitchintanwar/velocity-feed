@@ -25,7 +25,7 @@ func BenchmarkRuntimeMetrics_ManagerPoll(b *testing.B) {
 	gr, _ := goroutine.NewMetrics(f)
 
 	mgr := collector.NewManager(mem, g, gr, time.Minute) // We will poll manually
-	_ = mgr // Prevent unused variable error
+	_ = mgr                                              // Prevent unused variable error
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

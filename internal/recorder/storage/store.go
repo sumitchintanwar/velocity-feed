@@ -11,7 +11,7 @@ import (
 type EventStore interface {
 	// WriteBatch persists a slice of events efficiently.
 	WriteBatch(ctx context.Context, events []models.StoredEvent) error
-	
+
 	// ReadStream returns an iterator that streams events matching a symbol within a specific time range.
 	// Events should be returned strictly ordered by (Timestamp, SequenceNumber).
 	ReadStream(ctx context.Context, symbol string, start, end time.Time, chunkSize int) (EventIterator, error)

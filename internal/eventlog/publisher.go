@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/pubsub"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // PersistingPublisher wraps a pubsub.Publisher and persists every event

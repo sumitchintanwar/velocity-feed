@@ -16,11 +16,11 @@ import (
 	gws "github.com/gorilla/websocket"
 	"github.com/sumit/rtmds/internal/config"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/transport"
 	"github.com/sumit/rtmds/internal/websocket"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // mockHealthReporter implements transport.HealthReporter for testing.
@@ -47,7 +47,7 @@ func buildTestServer(t *testing.T) (wsURL string, tm topicmanager.Manager, cance
 		Metrics: config.MetricsConfig{Enabled: false},
 	}
 
-	router := transport.NewRouter(cfg, gw, logger, metrics, gatherer, &mockHealthReporter{}, nil, nil, nil, nil, nil)
+	router := transport.NewRouter(cfg, gw, logger, metrics, gatherer, &mockHealthReporter{}, nil, nil, nil, nil, nil, nil)
 	ts := httptest.NewServer(router)
 	t.Cleanup(ts.Close)
 

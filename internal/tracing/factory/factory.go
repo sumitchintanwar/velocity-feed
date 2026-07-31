@@ -40,8 +40,8 @@ func (f *Factory) StartLinkedSpan(ctx, linkCtx context.Context, component, opera
 	tracer := f.Tracer(component)
 	link := trace.LinkFromContext(linkCtx)
 	return tracer.Start(
-		ctx, 
-		operation, 
+		ctx,
+		operation,
 		trace.WithSpanKind(kind),
 		trace.WithAttributes(attributes.Component(component)),
 		trace.WithLinks(link),

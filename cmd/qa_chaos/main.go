@@ -25,7 +25,7 @@ func main() {
 	// Note: If you don't actually have a metric called rtmds_http_request_duration_seconds available
 	// in the local Prometheus right now, the CPU test validation might fail after 30 seconds.
 	// But it will prove the polling and HTTP connection works!
-	
+
 	experiments := map[chaos.Experiment][]chaos.Validator{
 		&infra.RedisOutageExperiment{
 			ContainerName: "rtmds-redis",
@@ -34,7 +34,7 @@ func main() {
 			&validation.LogValidator{
 				ExpectedMessage: "connection refused",
 				ExpectedLevel:   "ERROR",
-				MockFound:       true, 
+				MockFound:       true,
 			},
 		},
 		&perf.CPUStressExperiment{
@@ -43,11 +43,11 @@ func main() {
 		}: {
 			&validation.MetricValidator{
 				// In a real environment, we'd query CPU usage or latency.
-				// We use the UP metric here just to prove the Prometheus HTTP connection succeeds 
+				// We use the UP metric here just to prove the Prometheus HTTP connection succeeds
 				// locally without requiring specific RTMDS metrics to be populated yet.
 				Query: "up{job=\"prometheus\"}",
 				Condition: func(value float64) bool {
-					return value == 1.0 
+					return value == 1.0
 				},
 				PrometheusURL: "http://localhost:9090",
 			},

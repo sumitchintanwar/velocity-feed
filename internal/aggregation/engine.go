@@ -88,10 +88,8 @@ func (e *Engine) sweepStagnant(currentTime time.Time) {
 
 		// 3. Flush stagnant OHLC windows
 		for _, ohlcAgg := range agg.ohlcs {
-			if ohlcAgg.IsStagnant(currentTime) {
-				if ohlc := ohlcAgg.ForceFlush(); ohlc != nil {
-					agg.publishOHLC(*ohlc)
-				}
+			for _, ohlc := range ohlcAgg.FlushStagnant(currentTime) {
+				agg.publishOHLC(*ohlc)
 			}
 		}
 
@@ -103,7 +101,7 @@ func (e *Engine) sweepStagnant(currentTime time.Time) {
 // ProcessTick routes a tick to the appropriate symbol aggregators.
 func (e *Engine) ProcessTick(tick Tick) {
 	start := time.Now()
-	
+
 	TicksProcessed.WithLabelValues(tick.Symbol).Inc()
 
 	for {
@@ -121,7 +119,7 @@ func (e *Engine) ProcessTick(tick Tick) {
 		if agg.AddTick(tick) {
 			break // Success
 		}
-		
+
 		// If false, it was deleted. Loop around to LoadOrStore a fresh aggregator.
 	}
 
@@ -134,9 +132,9 @@ type symbolAggregator struct {
 	symbol    string
 	publishCh chan OHLC
 	publisher Publisher
-	
-	ohlcs         []*OHLCAggregator
-	vwap          *VWAPAggregator
+
+	ohlcs           []*OHLCAggregator
+	vwap            *VWAPAggregator
 	lastUpdate      time.Time
 	lastVWAPReset   time.Time
 	lastVWAPPublish time.Time
@@ -145,9 +143,9 @@ type symbolAggregator struct {
 
 func newSymbolAggregator(symbol string, publishCh chan OHLC, publisher Publisher, windows []WindowSize) *symbolAggregator {
 	agg := &symbolAggregator{
-		symbol:        symbol,
-		publishCh:     publishCh,
-		publisher:     publisher,
+		symbol:          symbol,
+		publishCh:       publishCh,
+		publisher:       publisher,
 		ohlcs:           make([]*OHLCAggregator, len(windows)),
 		vwap:            NewVWAPAggregator(),
 		lastUpdate:      time.Now(),
@@ -175,12 +173,9 @@ func (s *symbolAggregator) AddTick(tick Tick) bool {
 
 	// OHLCs
 	for _, ohlcAgg := range s.ohlcs {
-		finalized, late := ohlcAgg.AddTick(tick)
+		late := ohlcAgg.AddTick(tick, s.lastUpdate)
 		if late {
 			wasLate = true
-		}
-		if finalized != nil {
-			s.publishOHLC(*finalized)
 		}
 	}
 
@@ -190,7 +185,7 @@ func (s *symbolAggregator) AddTick(tick Tick) bool {
 
 	// VWAP
 	currentVWAP := s.vwap.AddTick(tick)
-	
+
 	// VWAP is throttled to 1 publish per second
 	if s.publisher != nil && tick.Timestamp.Sub(s.lastVWAPPublish) >= time.Second {
 		s.publisher.PublishVWAP(currentVWAP)
@@ -203,7 +198,7 @@ func (s *symbolAggregator) AddTick(tick Tick) bool {
 // publishOHLC safely dispatches the event without blocking the hot path
 func (s *symbolAggregator) publishOHLC(ohlc OHLC) {
 	AggregationsPublished.WithLabelValues(fmt.Sprintf("ohlc_%ds", int(time.Duration(ohlc.WindowSize).Seconds()))).Inc()
-	
+
 	// Non-blocking send to bounded channel.
 	// If channel is full, we must drop or block. In high freq systems, dropping is better than deadlock,
 	// but we must alert on it.

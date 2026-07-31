@@ -82,6 +82,6 @@ func (g *ComponentGroup) Stop(ctx context.Context) error {
 			finalErr = fmt.Errorf("%v; %v", finalErr, err)
 		}
 	}
-	
+
 	return finalErr
 }

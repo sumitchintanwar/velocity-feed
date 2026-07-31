@@ -27,11 +27,11 @@ func NewTracer(f *factory.Factory) Tracer {
 // StartQueryPlanningSpan initiates an Internal span for planning a replay query.
 func (t *tracerImpl) StartQueryPlanningSpan(ctx context.Context, mode string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "replay", "query_planning", trace.SpanKindInternal)
-	
+
 	span.SetAttributes(
 		attributes.ReplayMode(mode),
 	)
-	
+
 	return spanCtx, span
 }
 

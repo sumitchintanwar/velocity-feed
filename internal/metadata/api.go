@@ -72,30 +72,30 @@ func respondJSON(w http.ResponseWriter, data any) {
 
 func respondPaginatedJSON(w http.ResponseWriter, r *http.Request, insts []*Instrument) {
 	w.Header().Set("Content-Type", "application/json")
-	
+
 	// Basic string-based pagination fallback (in production, use standard query params)
 	limitStr := r.URL.Query().Get("limit")
 	offsetStr := r.URL.Query().Get("offset")
-	
+
 	limit := 100
 	offset := 0
-	
+
 	if l, err := strconv.Atoi(limitStr); err == nil && l > 0 {
 		limit = l
 	}
 	if o, err := strconv.Atoi(offsetStr); err == nil && o >= 0 {
 		offset = o
 	}
-	
+
 	if offset >= len(insts) {
 		_ = json.NewEncoder(w).Encode([]*Instrument{})
 		return
 	}
-	
+
 	end := offset + limit
 	if end > len(insts) {
 		end = len(insts)
 	}
-	
+
 	_ = json.NewEncoder(w).Encode(insts[offset:end])
 }

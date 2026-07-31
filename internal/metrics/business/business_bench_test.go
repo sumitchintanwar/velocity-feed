@@ -14,7 +14,7 @@ func BenchmarkBusinessMetrics_PublisherThroughput(b *testing.B) {
 	reg := registry.New()
 	cfg := config.DefaultConfig()
 	f := factory.New(reg, cfg, "marketdata")
-	
+
 	pub, _ := publisher.NewMetrics(f)
 	adapter := pub.NewAdapterMetrics("NASDAQ", "EQUITY")
 	b.ResetTimer()
@@ -29,9 +29,9 @@ func TestBusinessMetrics_StressConcurrency(t *testing.T) {
 	reg := registry.New()
 	cfg := config.DefaultConfig()
 	f := factory.New(reg, cfg, "marketdata")
-	
+
 	pub, _ := publisher.NewMetrics(f)
-	
+
 	var wg sync.WaitGroup
 	workers := 100
 	updatesPerWorker := 1000

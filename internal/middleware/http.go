@@ -8,11 +8,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	chimw "github.com/go-chi/chi/v5/middleware"
-	corrmw "github.com/sumit/rtmds/internal/correlation/middleware"
+	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/correlation/generator"
+	corrmw "github.com/sumit/rtmds/internal/correlation/middleware"
 	"github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/platform"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"

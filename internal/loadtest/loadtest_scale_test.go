@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // startScaleMockServer creates a lightweight WebSocket server that pushes
@@ -87,11 +87,11 @@ func runScaleTest(t *testing.T, connections int, duration time.Duration) {
 	addr, _ := startScaleMockServer(t)
 
 	cfg := Config{
-		ServerURL:       addr,
-		Connections:     connections,
-		Symbols:         []string{"AAPL", "MSFT", "GOOG", "TSLA", "NVDA"},
-		Duration:        duration,
-		ReportInterval:  2 * time.Second,
+		ServerURL:      addr,
+		Connections:    connections,
+		Symbols:        []string{"AAPL", "MSFT", "GOOG", "TSLA", "NVDA"},
+		Duration:       duration,
+		ReportInterval: 2 * time.Second,
 	}
 
 	pool := NewPool(cfg)

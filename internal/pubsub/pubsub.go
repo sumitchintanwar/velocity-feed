@@ -17,7 +17,7 @@ package pubsub
 import (
 	"context"
 
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Publisher accepts market events and distributes them to all active

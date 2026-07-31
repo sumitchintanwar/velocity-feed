@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	tracecontext "github.com/sumit/rtmds/internal/tracing/context"
 	"github.com/sumit/rtmds/internal/tracing/config"
+	tracecontext "github.com/sumit/rtmds/internal/tracing/context"
 	"github.com/sumit/rtmds/internal/tracing/factory"
 	"github.com/sumit/rtmds/internal/tracing/middleware"
 	"github.com/sumit/rtmds/internal/tracing/provider"
@@ -21,7 +21,7 @@ func TestTracingLifecycle(t *testing.T) {
 	ctx := context.Background()
 	cfg := config.DefaultConfig()
 	// Use dummy endpoint so it doesn't try to connect to a real OTLP collector
-	cfg.OTLPEndpoint = "localhost:4318" 
+	cfg.OTLPEndpoint = "localhost:4318"
 	cfg.Insecure = true
 
 	// 1. Initialize Provider
@@ -32,7 +32,7 @@ func TestTracingLifecycle(t *testing.T) {
 
 	// 2. Initialize Factory
 	f := factory.New()
-	
+
 	// 3. Start a span
 	spanCtx, span := f.StartSpan(ctx, "test_component", "test_operation")
 	if !span.IsRecording() {
@@ -53,10 +53,10 @@ func TestTracingLifecycle(t *testing.T) {
 	})
 
 	tracedHandler := middleware.HTTPTracing("test_http_route")(handler)
-	
+
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rr := httptest.NewRecorder()
-	
+
 	tracedHandler.ServeHTTP(rr, req)
 
 	// 5. Shutdown
@@ -106,9 +106,9 @@ func TestContextBranching(t *testing.T) {
 
 	// Verify trace context is still present in branched context
 	if !trace.SpanContextFromContext(branchedCtx).IsValid() {
-		// Even for NoopTracer, we might not have a valid span context, 
-		// but typically it retains whatever was in the parent. 
-		// Since Noop creates an invalid SpanContext by default, we just ensure 
+		// Even for NoopTracer, we might not have a valid span context,
+		// but typically it retains whatever was in the parent.
+		// Since Noop creates an invalid SpanContext by default, we just ensure
 		// the context is readable.
 	}
 }
@@ -116,7 +116,7 @@ func TestContextBranching(t *testing.T) {
 func BenchmarkFactorySpanCreation(b *testing.B) {
 	// Set an empty/noop provider for benchmarking raw factory overhead
 	otel.SetTracerProvider(trace.NewNoopTracerProvider())
-	
+
 	f := factory.New()
 	ctx := context.Background()
 

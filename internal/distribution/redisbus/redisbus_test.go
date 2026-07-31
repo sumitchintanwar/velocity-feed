@@ -9,8 +9,8 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // testRedisAddr returns the Redis address from the environment or a default.

@@ -61,7 +61,7 @@ func (v *MetricValidator) Assert(ctx context.Context) (chaos.ValidationResult, e
 	}
 
 	reqURL := fmt.Sprintf("%s/api/v1/query?query=%s", promURL, url.QueryEscape(v.Query))
-	
+
 	req, err := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
 	if err != nil {
 		return chaos.ValidationResult{Success: false}, fmt.Errorf("failed to create request: %w", err)

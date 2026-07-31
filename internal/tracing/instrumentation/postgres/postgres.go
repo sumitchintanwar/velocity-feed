@@ -27,12 +27,12 @@ func NewTracer(f *factory.Factory) Tracer {
 // OpenTelemetry DB attributes, keeping DB instrumentation decoupled from business logic.
 func (t *tracerImpl) StartQuerySpan(ctx context.Context, operation string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "postgresql", operation, trace.SpanKindClient)
-	
+
 	span.SetAttributes(
 		attributes.DBSystem("postgresql"),
 		attributes.DBOperation(operation),
 	)
-	
+
 	return spanCtx, span
 }
 

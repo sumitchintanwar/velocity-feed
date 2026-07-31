@@ -23,7 +23,7 @@ func TestManager_OrderedStartup_ReverseShutdown(t *testing.T) {
 	m.Register(c3)
 
 	ctx := context.Background()
-	
+
 	// Start all
 	err := m.StartAll(ctx, time.Second)
 	if err != nil {
@@ -34,7 +34,7 @@ func TestManager_OrderedStartup_ReverseShutdown(t *testing.T) {
 		t.Errorf("expected all components to be started")
 	}
 
-	// Stop all (should be in reverse order, though this test doesn't explicitly 
+	// Stop all (should be in reverse order, though this test doesn't explicitly
 	// hook the timing, we verify they all get the signal successfully).
 	err = m.StopAll(ctx, time.Second)
 	if err != nil {
@@ -49,10 +49,10 @@ func TestManager_OrderedStartup_ReverseShutdown(t *testing.T) {
 func TestManager_FailFast_Rollback(t *testing.T) {
 	m := lifecycle.NewManager()
 
-	c1 := adapters.NewMockRedis().(*adapters.MockService) // Starts successfully
-	c2 := adapters.NewMockPostgres().(*adapters.MockService) // Starts successfully
+	c1 := adapters.NewMockRedis().(*adapters.MockService)                                   // Starts successfully
+	c2 := adapters.NewMockPostgres().(*adapters.MockService)                                // Starts successfully
 	c3 := &adapters.MockService{ServiceName: "BrokenService", StartErr: errors.New("boom")} // FAILS
-	c4 := adapters.NewMockPublisher().(*adapters.MockService) // Should never start
+	c4 := adapters.NewMockPublisher().(*adapters.MockService)                               // Should never start
 
 	m.Register(c1)
 	m.Register(c2)
@@ -60,7 +60,7 @@ func TestManager_FailFast_Rollback(t *testing.T) {
 	m.Register(c4)
 
 	ctx := context.Background()
-	
+
 	// Start all
 	err := m.StartAll(ctx, time.Second)
 	if err == nil {
@@ -119,7 +119,7 @@ func TestManager_CustomTimeoutOverride(t *testing.T) {
 
 func TestManager_OnStartupComplete(t *testing.T) {
 	m := lifecycle.NewManager()
-	
+
 	m.Register(adapters.NewMockRedis())
 
 	hookFired := false
@@ -136,4 +136,3 @@ func TestManager_OnStartupComplete(t *testing.T) {
 		t.Fatalf("expected startup hook to have fired")
 	}
 }
-

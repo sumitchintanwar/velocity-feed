@@ -109,9 +109,10 @@ func TestClient_ReconnectAndResubscribe(t *testing.T) {
 		MaxReconnectAttempts: 5,
 		InitialBackoff:       10 * time.Millisecond,
 		MaxBackoff:           100 * time.Millisecond,
+		DialTimeout:          time.Second,
 	}
 
-	c, err := New(wsURL, opts)
+	c, err := Connect(wsURL, opts)
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
@@ -152,19 +153,20 @@ func TestClient_MaxReconnectAttempts(t *testing.T) {
 	gateway := newMockGateway(t)
 	server := httptest.NewServer(gateway)
 	wsURL := "ws" + strings.TrimPrefix(server.URL, "http")
-	
+
 	opts := Options{
 		Reconnect:            true,
 		MaxReconnectAttempts: 3,
 		InitialBackoff:       10 * time.Millisecond,
 		MaxBackoff:           50 * time.Millisecond,
+		DialTimeout:          time.Second,
 	}
 
-	c, err := New(wsURL, opts)
+	c, err := Connect(wsURL, opts)
 	if err != nil {
 		t.Fatalf("failed to create client: %v", err)
 	}
-	
+
 	// Shut down server so reconnects fail
 	server.Close()
 	gateway.closeAllClients()

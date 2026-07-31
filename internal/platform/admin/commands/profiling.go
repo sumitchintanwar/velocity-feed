@@ -16,11 +16,11 @@ func (c *SetProfilingRatesCommand) Execute(ctx context.Context) error {
 	if c.MutexFraction >= 0 {
 		runtime.SetMutexProfileFraction(c.MutexFraction)
 	}
-	
+
 	if c.BlockRate >= 0 {
 		runtime.SetBlockProfileRate(c.BlockRate)
 	}
-	
+
 	return nil
 }
 

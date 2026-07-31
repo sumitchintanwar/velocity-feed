@@ -5,13 +5,13 @@
 //
 // Usage:
 //
-//	c, err := client.New("ws://localhost:8080/ws")
+//	c, err := client.Connect("ws://localhost:8080/ws", protocol.FormatProtobuf, protocol.FormatJSON)
 //	if err != nil { panic(err) }
 //	defer c.Close()
 //
 //	c.Subscribe("AAPL", "TSLA")
-//	for msg := range c.Messages() {
-//	    fmt.Println(msg)
+//	for event := range c.Receive() {
+//	    fmt.Printf("%s: %s\n", event.EventSymbol(), event.EventType())
 //	}
 package client
 
@@ -24,6 +24,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/sumit/rtmds/pkg/marketdata"
+	"github.com/sumit/rtmds/pkg/protocol"
 	"nhooyr.io/websocket"
 )
 
@@ -31,8 +33,8 @@ import (
 // but the client is currently disconnected.
 var ErrDisconnected = errors.New("client: disconnected")
 
-// Message is the envelope received from the server.
-type Message struct {
+// ControlMessage is the envelope received from the server for non-market data.
+type ControlMessage struct {
 	Type    string          `json:"type"`
 	Payload json.RawMessage `json:"payload"`
 }
@@ -62,68 +64,88 @@ func DefaultOptions() Options {
 	}
 }
 
-// dialTimeout is the default timeout for WebSocket dial operations.
 const dialTimeout = 5 * time.Second
 
-// newRng creates a new seeded random number generator for jitter calculations.
 func newRng() *rand.Rand {
 	return rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 }
 
-// Client is a WebSocket client for the RTMDS server. It implements the
-// fat client pattern: subscriptions are tracked client-side and automatically
-// re-sent after a reconnect, so any gateway can serve any client.
+// Client is a WebSocket client for the RTMDS server.
 type Client struct {
-	url    string
-	opts   Options
-	conn   *websocket.Conn
-	msgCh  chan Message
-	doneCh chan struct{}
+	url     string
+	opts    Options
+	conn    *websocket.Conn
+	msgCh   chan marketdata.MarketEvent
+	doneCh  chan struct{}
+	closeCh chan struct{}
 
-	// mu protects conn and subscriptions during reconnect.
-	mu            sync.Mutex
-	subscriptions []string // client-side subscription state (source of truth)
-	reconnecting  bool
+	registry   *protocol.Registry
+	serializer protocol.Serializer
+	formats    []protocol.Format
+
+	mu              sync.Mutex
+	subscriptions   []string
+	reconnecting    bool
 	cancelReconnect context.CancelFunc
 
 	closing      bool
 	shutdownOnce sync.Once
+	resumeSeq    map[string]uint64
 }
 
-// New dials the RTMDS WebSocket endpoint and returns a ready Client.
-func New(url string, opts ...Options) (*Client, error) {
-	o := DefaultOptions()
-	if len(opts) > 0 {
-		o = opts[0]
+// Connect dials the RTMDS WebSocket endpoint and negotiates the subprotocol.
+func Connect(url string, opts Options, formats ...protocol.Format) (*Client, error) {
+	if len(formats) == 0 {
+		formats = []protocol.Format{protocol.FormatFlatBuffers, protocol.FormatProtobuf, protocol.FormatJSON}
 	}
 
-	dialCtx, dialCancel := context.WithTimeout(context.Background(), dialTimeout)
+	registry := protocol.NewRegistry()
+	registry.Register(protocol.NewJSONSerializer())
+	registry.Register(protocol.NewProtobufSerializer())
+	registry.Register(protocol.NewFlatBuffersSerializer())
+
+	dialCtx, dialCancel := context.WithTimeout(context.Background(), opts.DialTimeout)
 	defer dialCancel()
-	conn, _, err := websocket.Dial(dialCtx, url, nil)
+
+	dialOpts := &websocket.DialOptions{}
+	for _, f := range formats {
+		dialOpts.Subprotocols = append(dialOpts.Subprotocols, protocol.FormatToSubprotocol(f))
+	}
+
+	conn, resp, err := websocket.Dial(dialCtx, url, dialOpts)
 	if err != nil {
 		return nil, fmt.Errorf("client: dial %q: %w", url, err)
 	}
 
+	negotiated := resp.Header.Get("Sec-WebSocket-Protocol")
+	negotiator := protocol.NewNegotiator()
+	format, _, _ := negotiator.SelectProtocol([]string{negotiated})
+
+	serializer, _ := registry.Lookup(format)
+	if serializer == nil {
+		// Fallback to JSON if negotiation failed or server ignored it
+		serializer, _ = registry.Lookup(protocol.FormatJSON)
+	}
+
 	c := &Client{
-		url:  url,
-		opts: o,
-		conn: conn,
-		msgCh:  make(chan Message, 256),
-		doneCh: make(chan struct{}),
+		url:        url,
+		opts:       opts,
+		conn:       conn,
+		msgCh:      make(chan marketdata.MarketEvent, 256),
+		doneCh:     make(chan struct{}),
+		closeCh:    make(chan struct{}),
+		registry:   registry,
+		serializer: serializer,
+		formats:    formats,
+		resumeSeq:  make(map[string]uint64),
 	}
 	go c.readLoop()
 	return c, nil
 }
 
-// Subscribe sends a subscribe command to the server and records the
-// subscription client-side. On reconnect, all recorded subscriptions
-// are automatically re-sent to the new gateway.
-//
-// Returns ErrDisconnected if the client is currently disconnected.
-// The subscription is still tracked locally and will be re-sent on reconnect.
+// Subscribe sends a subscribe command to the server and records it.
 func (c *Client) Subscribe(symbols ...string) error {
 	c.mu.Lock()
-	// Merge new symbols into tracked subscriptions (deduplicate).
 	seen := make(map[string]struct{}, len(c.subscriptions))
 	for _, s := range c.subscriptions {
 		seen[s] = struct{}{}
@@ -142,88 +164,52 @@ func (c *Client) Subscribe(symbols ...string) error {
 	return c.writeSubscribe(symbols)
 }
 
-// Unsubscribe sends an unsubscribe command and removes symbols from
-// the tracked subscription list.
-func (c *Client) Unsubscribe(symbols ...string) error {
-	c.mu.Lock()
-	remove := make(map[string]struct{}, len(symbols))
-	for _, s := range symbols {
-		remove[s] = struct{}{}
-	}
-	filtered := c.subscriptions[:0]
-	for _, s := range c.subscriptions {
-		if _, ok := remove[s]; !ok {
-			filtered = append(filtered, s)
-		}
-	}
-	c.subscriptions = filtered
-	conn := c.conn
-	c.mu.Unlock()
-
-	if conn == nil {
-		return ErrDisconnected
-	}
-	return c.writeUnsubscribe(symbols)
-}
-
-// Subscriptions returns a snapshot of the currently tracked subscriptions.
-func (c *Client) Subscriptions() []string {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	out := make([]string, len(c.subscriptions))
-	copy(out, c.subscriptions)
-	return out
-}
-
-// Messages returns the channel on which server messages are delivered.
-// The channel is closed when the connection is closed (and reconnect is disabled).
-func (c *Client) Messages() <-chan Message {
+// Receive returns the channel on which server market events are delivered.
+func (c *Client) Receive() <-chan marketdata.MarketEvent {
 	return c.msgCh
 }
 
-// Done returns a channel that is closed when the client permanently shuts down
-// (either Close is called or reconnect is exhausted).
+// Done returns a channel that is closed when the client is permanently shut down.
 func (c *Client) Done() <-chan struct{} {
 	return c.doneCh
 }
 
-// Close gracefully closes the WebSocket connection and disables reconnect.
+// Reconnect triggers a manual reconnect.
+func (c *Client) Reconnect() {
+	go c.reconnect()
+}
+
 func (c *Client) Close() error {
-	// Disable reconnect before closing.
 	c.mu.Lock()
+	if c.closing {
+		c.mu.Unlock()
+		return nil
+	}
 	c.reconnecting = false
 	c.opts.Reconnect = false
 	c.closing = true
 	if c.cancelReconnect != nil {
 		c.cancelReconnect()
 	}
+	close(c.closeCh)
 	c.mu.Unlock()
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = c.conn.Close(websocket.StatusNormalClosure, "")
+	if c.conn != nil {
+		_ = c.conn.Close(websocket.StatusNormalClosure, "")
+	}
 	<-c.doneCh
 	_ = ctx
 	return nil
 }
 
-// RunUntil blocks until ctx is cancelled, then closes the connection.
-func (c *Client) RunUntil(ctx context.Context) error {
-	select {
-	case <-ctx.Done():
-		return c.Close()
-	case <-c.doneCh:
-		return nil
-	}
-}
-
-// writeSubscribe sends a subscribe message to the server.
 func (c *Client) writeSubscribe(symbols []string) error {
 	c.mu.Lock()
 	conn := c.conn
 	c.mu.Unlock()
 	if conn == nil {
-		return fmt.Errorf("client: not connected")
+		return ErrDisconnected
 	}
 	return conn.Write(context.Background(), websocket.MessageText, mustMarshal(map[string]any{
 		"action":  "subscribe",
@@ -231,21 +217,6 @@ func (c *Client) writeSubscribe(symbols []string) error {
 	}))
 }
 
-// writeUnsubscribe sends an unsubscribe message to the server.
-func (c *Client) writeUnsubscribe(symbols []string) error {
-	c.mu.Lock()
-	conn := c.conn
-	c.mu.Unlock()
-	if conn == nil {
-		return fmt.Errorf("client: not connected")
-	}
-	return conn.Write(context.Background(), websocket.MessageText, mustMarshal(map[string]any{
-		"action":  "unsubscribe",
-		"symbols": symbols,
-	}))
-}
-
-// shutdown safely closes the client's channels exactly once.
 func (c *Client) shutdown() {
 	c.shutdownOnce.Do(func() {
 		close(c.msgCh)
@@ -253,8 +224,6 @@ func (c *Client) shutdown() {
 	})
 }
 
-// readLoop reads messages from the WebSocket and dispatches them.
-// On connection loss, it attempts to reconnect if enabled.
 func (c *Client) readLoop() {
 	for {
 		c.mu.Lock()
@@ -267,10 +236,8 @@ func (c *Client) readLoop() {
 			return
 		}
 
-		_, data, err := conn.Read(context.Background())
+		msgType, data, err := conn.Read(context.Background())
 		if err != nil {
-			// Explicitly close the old connection to prevent resource leaks
-			// (file descriptors, TCP sockets in CLOSE_WAIT state).
 			_ = conn.Close(websocket.StatusNormalClosure, "")
 
 			c.mu.Lock()
@@ -278,21 +245,63 @@ func (c *Client) readLoop() {
 			c.mu.Unlock()
 			if c.opts.Reconnect && !closing {
 				c.reconnect()
-				return // readLoop exits; reconnectLoop starts a new one
+				return
 			}
 			c.shutdown()
 			return
 		}
-		var msg Message
-		if err := json.Unmarshal(data, &msg); err != nil {
-			continue
+
+		// Attempt to deserialize as a market event first
+		if msgType == websocket.MessageBinary || c.serializer.Format() == protocol.FormatJSON {
+			event, err := c.serializer.Deserialize(data)
+			if err == nil {
+				// Automatic heartbeat reply
+				if ping, ok := event.(marketdata.PingMessage); ok {
+					b, _ := json.Marshal(map[string]any{
+						"action":    "pong",
+						"timestamp": ping.Timestamp,
+					})
+					c.mu.Lock()
+					if c.conn != nil {
+						_ = c.conn.Write(context.Background(), websocket.MessageText, b)
+					}
+					c.mu.Unlock()
+					continue
+				}
+
+				if seqEv, ok := event.(marketdata.SequencedEvent); ok {
+					seq := uint64(seqEv.GetSeq())
+					if seq > 0 {
+						c.mu.Lock()
+						c.resumeSeq[event.EventSymbol()] = seq
+						c.mu.Unlock()
+					}
+				}
+
+				select {
+				case c.msgCh <- event:
+				case <-c.closeCh:
+					c.shutdown()
+					return
+				}
+				continue
+			}
 		}
-		c.msgCh <- msg
+
+		// Fallback for JSON control messages
+		if msgType == websocket.MessageText {
+			var msg ControlMessage
+			if err := json.Unmarshal(data, &msg); err == nil {
+				// We can handle control messages like 'error' or 'subscribed' here
+				continue
+			}
+		}
+
+		// Log if we completely failed to parse a message
+		fmt.Printf("client %p: failed to parse message: %s\n", c, string(data))
 	}
 }
 
-// reconnect attempts to re-establish the WebSocket connection and
-// re-send all tracked subscriptions to the new gateway.
 func (c *Client) reconnect() {
 	c.mu.Lock()
 	if c.reconnecting {
@@ -300,7 +309,6 @@ func (c *Client) reconnect() {
 		return
 	}
 	c.reconnecting = true
-	// Clear the connection so Subscribe/Unsubscribe return ErrDisconnected.
 	c.conn = nil
 	ctx, cancel := context.WithCancel(context.Background())
 	c.cancelReconnect = cancel
@@ -331,21 +339,28 @@ func (c *Client) reconnect() {
 			}
 			attempts++
 
-			// Apply +/- 20% jitter using seeded RNG.
-			jitter := (rng.Float64() * 0.4) - 0.2 // range [-0.2, 0.2)
+			jitter := (rng.Float64() * 0.4) - 0.2
 			sleepDuration := time.Duration(float64(backoff) * (1.0 + jitter))
 
 			select {
 			case <-ctx.Done():
+				c.shutdown()
 				return
 			case <-time.After(sleepDuration):
 			}
 
-			dialCtx, dialCancel := context.WithTimeout(context.Background(), dialTimeout)
-			conn, _, err := websocket.Dial(dialCtx, c.url, nil)
+			timeout := c.opts.DialTimeout
+			if timeout == 0 {
+				timeout = dialTimeout
+			}
+			dialCtx, dialCancel := context.WithTimeout(context.Background(), timeout)
+			dialOpts := &websocket.DialOptions{}
+			for _, f := range c.formats {
+				dialOpts.Subprotocols = append(dialOpts.Subprotocols, protocol.FormatToSubprotocol(f))
+			}
+			conn, resp, err := websocket.Dial(dialCtx, c.url, dialOpts)
 			dialCancel()
 			if err != nil {
-				// Exponential backoff with cap.
 				backoff = backoff * 2
 				if backoff > c.opts.MaxBackoff {
 					backoff = c.opts.MaxBackoff
@@ -353,18 +368,42 @@ func (c *Client) reconnect() {
 				continue
 			}
 
+			negotiated := resp.Header.Get("Sec-WebSocket-Protocol")
+			negotiator := protocol.NewNegotiator()
+			format, _, _ := negotiator.SelectProtocol([]string{negotiated})
+			serializer, _ := c.registry.Lookup(format)
+			if serializer == nil {
+				serializer, _ = c.registry.Lookup(protocol.FormatJSON)
+			}
+
 			c.mu.Lock()
 			c.conn = conn
-			c.mu.Unlock()
-
-			// Re-send all tracked subscriptions to the new gateway.
-			c.mu.Lock()
+			c.serializer = serializer
 			subs := make([]string, len(c.subscriptions))
 			copy(subs, c.subscriptions)
+			resumeSeqCopy := make(map[string]uint64, len(c.resumeSeq))
+			for k, v := range c.resumeSeq {
+				resumeSeqCopy[k] = v
+			}
 			c.mu.Unlock()
 
 			if len(subs) > 0 {
-				if err := c.writeSubscribe(subs); err != nil {
+				payload := map[string]any{
+					"action":  "reconnect",
+					"symbols": subs,
+				}
+				if len(resumeSeqCopy) > 0 {
+					payload["resume_seq"] = resumeSeqCopy
+				} else {
+					payload["action"] = "subscribe"
+				}
+				// Pass the reconnect start time to measure reconnect latency on the server
+				if payload["action"] == "reconnect" {
+					payload["reconnect_start"] = time.Now().UnixNano()
+				}
+				b, _ := json.Marshal(payload)
+
+				if err := conn.Write(context.Background(), websocket.MessageText, b); err != nil {
 					c.mu.Lock()
 					c.conn.Close(websocket.StatusNormalClosure, "")
 					c.conn = nil
@@ -377,11 +416,6 @@ func (c *Client) reconnect() {
 				}
 			}
 
-			// Reset backoff on successful reconnect.
-			backoff = c.opts.InitialBackoff
-			attempts = 0
-
-			// Start a new read loop for the reconnected socket.
 			go c.readLoop()
 			return
 		}

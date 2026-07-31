@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func benchQuote(symbol string) marketdata.Quote {

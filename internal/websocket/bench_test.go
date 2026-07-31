@@ -12,16 +12,16 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 var (
-	sharedGateway  *Gateway
-	sharedTM       topicmanager.Manager
-	sharedURL      string
-	sharedServer   *httptest.Server
+	sharedGateway *Gateway
+	sharedTM      topicmanager.Manager
+	sharedURL     string
+	sharedServer  *httptest.Server
 )
 
 func TestMain(m *testing.M) {
@@ -30,7 +30,7 @@ func TestMain(m *testing.M) {
 	sharedGateway = NewGateway(sharedTM, log.New(nil, "bench"), metrics, 0, "bench-gw") // 0 = no rate limit for benchmarks
 	sharedServer = httptest.NewServer(sharedGateway.Handler())
 	sharedURL = "ws" + strings.TrimPrefix(sharedServer.URL, "http") + "/ws"
-	
+
 	code := m.Run()
 	sharedServer.Close()
 	os.Exit(code)

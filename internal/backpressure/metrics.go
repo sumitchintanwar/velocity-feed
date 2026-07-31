@@ -7,8 +7,8 @@ import (
 
 // Metrics holds Prometheus instruments for backpressure monitoring.
 type Metrics struct {
-	// EventsDroppedTotal counts events dropped across all channels.
-	EventsDroppedTotal prometheus.Counter
+	// DroppedMessagesTotal counts events dropped across all channels.
+	DroppedMessagesTotal prometheus.Counter
 
 	// BufferOccupancy records the current fill ratio of ring buffers.
 	// Bucketed histogram for dashboards and alerting.
@@ -30,10 +30,10 @@ func NewMetrics(reg prometheus.Registerer) *Metrics {
 	f := promauto.With(reg)
 
 	return &Metrics{
-		EventsDroppedTotal: f.NewCounter(prometheus.CounterOpts{
+		DroppedMessagesTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: "rtmds",
 			Subsystem: "backpressure",
-			Name:      "events_dropped_total",
+			Name:      "dropped_messages_total",
 			Help:      "Total number of events dropped due to backpressure.",
 		}),
 

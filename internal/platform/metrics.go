@@ -14,35 +14,38 @@ import (
 //   - Labels use only bounded dimensions (provider, reason, action).
 type Metrics struct {
 	// Feed layer
-	FeedMessagesReceived *prometheus.CounterVec // labels: provider
-	FeedErrors           *prometheus.CounterVec // labels: provider, kind
-	DataStaleness        prometheus.Gauge       // current_system_time - exchange_timestamp
+	MessagesGeneratedTotal *prometheus.CounterVec // labels: provider
+	PublishErrorsTotal     *prometheus.CounterVec // labels: provider, kind
+	DataStaleness          prometheus.Gauge       // current_system_time - exchange_timestamp
+	PublishDurationSeconds prometheus.Histogram   // time to write to pub/sub
 
 	// Distribution layer
-	BroadcastsTotal    prometheus.Counter
-	EventsDroppedTotal prometheus.Counter
-	SubscribersActive  prometheus.Gauge
-	SubscriptionEvents *prometheus.CounterVec
+	MessagesPublishedTotal prometheus.Counter
+	DroppedMessagesTotal   prometheus.Counter
+	SubscribersActive      prometheus.Gauge
+	SubscriptionEvents     *prometheus.CounterVec
 
 	// WebSocket layer
-	WSConnectionsActive      prometheus.Gauge
-	WSConnectionsOpened      prometheus.Counter
-	WSConnectionsClosed      prometheus.Counter
-	WSConnectionAttempts     prometheus.Counter
-	WSActiveSubscriptions    prometheus.Gauge
-	WSSlowConsumers          prometheus.Gauge
-	WSMessagesWritten        prometheus.Counter
-	WSWriteErrors            prometheus.Counter
-	WSBytesSent              prometheus.Counter
-	WSMessageSize            prometheus.Histogram
-	WSDeliveryLatency        prometheus.Histogram
-	WSPingLatency            prometheus.Histogram
-	WSPingSentTotal          prometheus.Counter
-	WSPongReceivedTotal      prometheus.Counter
-	WSTimeoutsTotal          prometheus.Counter
-	WSHeartbeatCleanupsTotal prometheus.Counter
-	WSAuthFailures           prometheus.Counter
-	WSHandshakeDuration      prometheus.Histogram
+	ActiveConnections           prometheus.Gauge
+	WSConnectionsOpened         prometheus.Counter
+	WSConnectionsClosed         prometheus.Counter
+	WSConnectionAttempts        prometheus.Counter
+	WSActiveSubscriptions       prometheus.Gauge
+	WSSlowConsumers             prometheus.Gauge
+	MessagesSentTotal           prometheus.Counter
+	WebsocketWriteErrorsTotal   prometheus.Counter
+	WSBytesSent                 prometheus.Counter
+	WSMessageSize               prometheus.Histogram
+	WSDeliveryLatency           prometheus.Histogram
+	WSPingLatency               prometheus.Histogram
+	WSPingSentTotal             prometheus.Counter
+	WSPongReceivedTotal         prometheus.Counter
+	WSTimeoutsTotal             prometheus.Counter
+	WSHeartbeatCleanupsTotal    prometheus.Counter
+	WSAuthFailures              prometheus.Counter
+	WSHandshakeDuration         prometheus.Histogram
+	ConnectionDurationSeconds   prometheus.Histogram
+	BroadcastDurationSeconds    prometheus.Histogram
 
 	// Reconnect layer
 	WSReconnectAttemptsTotal prometheus.Counter
@@ -59,12 +62,23 @@ type Metrics struct {
 	HTTPRequestDuration *prometheus.HistogramVec
 
 	// Distributed routing
-	DistRedisSubscriptions    prometheus.Gauge   // current Redis channel subscriptions
-	DistRedisSubscribeOps     prometheus.Counter // total Redis SUBSCRIBE commands
-	DistRedisUnsubscribeOps   prometheus.Counter // total Redis UNSUBSCRIBE commands
-	DistEventsRouted          prometheus.Counter // events received from Redis and routed locally
-	DistSymbolsLocalSubs      prometheus.Gauge   // current symbols with local subscribers
-	DistSubscriptionEvents    *prometheus.CounterVec // labels: action (subscribe/unsubscribe)
+	DistRedisSubscriptions       prometheus.Gauge       // current Redis channel subscriptions
+	DistRedisSubscribeOps        prometheus.Counter     // total Redis SUBSCRIBE commands
+	DistRedisUnsubscribeOps      prometheus.Counter     // total Redis UNSUBSCRIBE commands
+	MessagesReceivedTotal        prometheus.Counter     // events received from Redis and routed locally
+	DistSymbolsLocalSubs         prometheus.Gauge       // current symbols with local subscribers
+	DistSubscriptionEvents       *prometheus.CounterVec // labels: action (subscribe/unsubscribe)
+	RedisReceiveLatencySeconds   prometheus.Histogram
+
+	// Gateway Lifecycle
+	GatewayState                 prometheus.Gauge
+	GatewayStateTransitionsTotal *prometheus.CounterVec // labels: from_state, to_state
+	GatewayRecoveryTime          prometheus.Histogram
+	GatewayDowntime              prometheus.Histogram
+
+	// Fault Tolerance
+	WSReconnectLatency prometheus.Histogram
+	WSReplayDuration   prometheus.Histogram
 }
 
 // NewMetrics creates an isolated Prometheus registry and registers all
@@ -80,18 +94,18 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 
 	return &Metrics{
 		// ── Feed layer ─────────────────────────────────────────
-		FeedMessagesReceived: f.NewCounterVec(prometheus.CounterOpts{
+		MessagesGeneratedTotal: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "feed",
-			Name:      "messages_received_total",
+			Name:      "messages_generated_total",
 			Help:      "Total number of raw messages received from upstream feeds.",
 		}, []string{"provider"}), // cardinality fix: removed `symbol` label
 
-		FeedErrors: f.NewCounterVec(prometheus.CounterOpts{
+		PublishErrorsTotal: f.NewCounterVec(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "feed",
-			Name:      "errors_total",
-			Help:      "Total number of errors encountered while reading upstream feeds.",
+			Name:      "publish_errors_total",
+			Help:      "Total number of errors encountered while reading upstream feeds or publishing.",
 		}, []string{"provider", "kind"}),
 
 		DataStaleness: f.NewGauge(prometheus.GaugeOpts{
@@ -101,18 +115,26 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Help:      "Current data staleness: wall clock minus most recent exchange timestamp.",
 		}),
 
+		PublishDurationSeconds: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "feed",
+			Name:      "publish_duration_seconds",
+			Help:      "Time taken to publish a message to the distribution layer.",
+			Buckets:   []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1},
+		}),
+
 		// ── Distribution layer ──────────────────────────────────
-		BroadcastsTotal: f.NewCounter(prometheus.CounterOpts{
+		MessagesPublishedTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "distribution",
-			Name:      "broadcasts_total",
+			Name:      "messages_published_total",
 			Help:      "Total number of market-data events broadcast to subscribers.",
 		}),
 
-		EventsDroppedTotal: f.NewCounter(prometheus.CounterOpts{
+		DroppedMessagesTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "distribution",
-			Name:      "events_dropped_total",
+			Name:      "dropped_messages_total",
 			Help:      "Total number of events dropped due to backpressure (buffer full).",
 		}), // cardinality fix: removed per-topic/subscriber label
 
@@ -131,10 +153,10 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 		}, []string{"action"}), // action: subscribe | unsubscribe
 
 		// ── WebSocket layer ─────────────────────────────────────
-		WSConnectionsActive: f.NewGauge(prometheus.GaugeOpts{
+		ActiveConnections: f.NewGauge(prometheus.GaugeOpts{
 			Namespace: namespace,
 			Subsystem: "websocket",
-			Name:      "connections_active",
+			Name:      "active_connections",
 			Help:      "Current number of open WebSocket connections.",
 		}),
 
@@ -173,17 +195,17 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Help:      "Current number of slow consumers (backpressure applied).",
 		}),
 
-		WSMessagesWritten: f.NewCounter(prometheus.CounterOpts{
+		MessagesSentTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "websocket",
-			Name:      "messages_written_total",
+			Name:      "messages_sent_total",
 			Help:      "Total number of messages successfully written to WebSocket clients.",
 		}),
 
-		WSWriteErrors: f.NewCounter(prometheus.CounterOpts{
+		WebsocketWriteErrorsTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "websocket",
-			Name:      "write_errors_total",
+			Name:      "websocket_write_errors_total",
 			Help:      "Total number of errors when writing to WebSocket clients.",
 		}),
 
@@ -261,6 +283,22 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Buckets:   prometheus.DefBuckets,
 		}),
 
+		ConnectionDurationSeconds: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "connection_duration_seconds",
+			Help:      "Duration a WebSocket client stayed connected before disconnecting.",
+			Buckets:   []float64{1, 5, 10, 30, 60, 300, 900, 3600, 14400, 86400},
+		}),
+
+		BroadcastDurationSeconds: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "broadcast_duration_seconds",
+			Help:      "Duration taken to fan-out an event to all local subscribers.",
+			Buckets:   []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5},
+		}),
+
 		WSReconnectAttemptsTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "websocket",
@@ -294,6 +332,22 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Subsystem: "websocket",
 			Name:      "sequence_gaps_total",
 			Help:      "Total number of sequence gaps detected in the writePump hot path.",
+		}),
+
+		WSReconnectLatency: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "reconnect_latency_seconds",
+			Help:      "Histogram of WebSocket reconnect latencies.",
+			Buckets:   []float64{0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0},
+		}),
+
+		WSReplayDuration: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "websocket",
+			Name:      "replay_duration_seconds",
+			Help:      "Histogram of WAL replay durations during reconnection.",
+			Buckets:   []float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0},
 		}),
 
 		// ── Build info ──────────────────────────────────────────
@@ -341,11 +395,19 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Help:      "Total number of Redis UNSUBSCRIBE commands issued by the distributed router.",
 		}),
 
-		DistEventsRouted: f.NewCounter(prometheus.CounterOpts{
+		MessagesReceivedTotal: f.NewCounter(prometheus.CounterOpts{
 			Namespace: namespace,
 			Subsystem: "distributed",
-			Name:      "events_routed_total",
+			Name:      "messages_received_total",
 			Help:      "Total number of events received from Redis and routed to local subscribers.",
+		}),
+
+		RedisReceiveLatencySeconds: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "distributed",
+			Name:      "redis_receive_latency_seconds",
+			Help:      "Latency from Redis SUBSCRIBE to Gateway arrival.",
+			Buckets:   []float64{0.0001, 0.0005, 0.001, 0.005, 0.01, 0.05, 0.1, 0.5},
 		}),
 
 		DistSymbolsLocalSubs: f.NewGauge(prometheus.GaugeOpts{
@@ -361,5 +423,36 @@ func NewMetrics(namespace string) (*Metrics, prometheus.Gatherer) {
 			Name:      "subscription_events_total",
 			Help:      "Total distributed subscription events (subscribe/unsubscribe to Redis channels).",
 		}, []string{"action"}),
+
+		// ── Gateway Lifecycle ──────────────────────────────────────
+		GatewayState: f.NewGauge(prometheus.GaugeOpts{
+			Namespace: namespace,
+			Subsystem: "gateway",
+			Name:      "state",
+			Help:      "Current lifecycle state of the gateway (0=Starting, 1=Healthy, 2=Draining, 3=Offline)",
+		}),
+
+		GatewayStateTransitionsTotal: f.NewCounterVec(prometheus.CounterOpts{
+			Namespace: namespace,
+			Subsystem: "gateway",
+			Name:      "state_transitions_total",
+			Help:      "Total number of state transitions.",
+		}, []string{"from_state", "to_state"}),
+
+		GatewayRecoveryTime: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "gateway",
+			Name:      "recovery_time_seconds",
+			Help:      "Histogram of gateway recovery times (Starting/Draining to Healthy).",
+			Buckets:   []float64{0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0},
+		}),
+
+		GatewayDowntime: f.NewHistogram(prometheus.HistogramOpts{
+			Namespace: namespace,
+			Subsystem: "gateway",
+			Name:      "downtime_seconds",
+			Help:      "Histogram of gateway downtime (Offline state duration).",
+			Buckets:   []float64{1.0, 5.0, 10.0, 30.0, 60.0, 300.0},
+		}),
 	}, reg
 }

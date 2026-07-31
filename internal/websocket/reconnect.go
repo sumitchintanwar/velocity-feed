@@ -70,7 +70,7 @@ type ReconnectClient struct {
 	log    zerolog.Logger
 
 	// Subscription registry — client owns subscription state.
-	subMu       sync.RWMutex
+	subMu         sync.RWMutex
 	subscriptions map[string]bool
 
 	// Active connection.
@@ -88,10 +88,10 @@ type ReconnectClient struct {
 	attempt atomic.Int64
 
 	// Metrics (optional — nil disables).
-	reconnectAttempts   func()
-	reconnectSuccess    func()
-	reconnectFailures   func()
-	resubscriptions     func()
+	reconnectAttempts func()
+	reconnectSuccess  func()
+	reconnectFailures func()
+	resubscriptions   func()
 
 	// backoffFn is overridable for testing.
 	backoffFn func(attempt int) time.Duration

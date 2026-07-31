@@ -27,22 +27,22 @@ func NewTracer(f *factory.Factory) Tracer {
 // StartSaveSpan initiates an Internal span representing the process of saving a snapshot.
 func (t *tracerImpl) StartSaveSpan(ctx context.Context, snapType string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "snapshot", "save", trace.SpanKindInternal)
-	
+
 	span.SetAttributes(
 		attributes.SnapshotType(snapType),
 	)
-	
+
 	return spanCtx, span
 }
 
 // StartRestoreSpan initiates an Internal span representing the process of restoring from a snapshot.
 func (t *tracerImpl) StartRestoreSpan(ctx context.Context, snapType string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "snapshot", "restore", trace.SpanKindInternal)
-	
+
 	span.SetAttributes(
 		attributes.SnapshotType(snapType),
 	)
-	
+
 	return spanCtx, span
 }
 

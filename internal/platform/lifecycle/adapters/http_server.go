@@ -32,7 +32,7 @@ func (a *HTTPServerAdapter) Start(ctx context.Context) error {
 	// We run ListenAndServe in a goroutine because it blocks indefinitely.
 	// We use an error channel to catch immediate bind failures (e.g. port in use).
 	errCh := make(chan error, 1)
-	
+
 	go func() {
 		if err := a.Server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- err

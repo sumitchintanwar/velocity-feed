@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func newTestManager(t *testing.T) *MemoryManager {
@@ -63,7 +63,7 @@ func TestSubscribe_DeliversEvents(t *testing.T) {
 		t.Errorf("unexpected: %+v", quote)
 	}
 	// Verify pre-encoded JSON is non-empty.
-	if len(cached.EncodedMsg) == 0 {
+	if len(cached.JSON) == 0 {
 		t.Error("expected non-empty pre-encoded JSON")
 	}
 }

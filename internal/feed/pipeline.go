@@ -10,11 +10,11 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
 	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/tracing"
+	"github.com/sumit/rtmds/pkg/marketdata"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -32,8 +32,8 @@ type Pipeline struct {
 	publisher pubsub.Publisher
 	seq       sequencer.Generator
 	log       *log.Logger
-	metrics   *platform.Metrics    // optional; nil disables instrumentation
-	heartbeat HeartbeatUpdater     // optional; nil disables liveness heartbeat
+	metrics   *platform.Metrics // optional; nil disables instrumentation
+	heartbeat HeartbeatUpdater  // optional; nil disables liveness heartbeat
 }
 
 // NewPipeline creates a Pipeline. The metrics parameter is optional —
@@ -75,7 +75,7 @@ func (p *Pipeline) Run(ctx context.Context) error {
 		span.RecordError(err)
 		span.SetAttributes(attribute.String("event", "pipeline_feed_start_error"))
 		if p.metrics != nil {
-			p.metrics.FeedErrors.WithLabelValues(p.feed.Name(), "start").Inc()
+			p.metrics.PublishErrorsTotal.WithLabelValues(p.feed.Name(), "start").Inc()
 		}
 		return fmt.Errorf("pipeline: feed start: %w", err)
 	}
@@ -96,19 +96,18 @@ func (p *Pipeline) Run(ctx context.Context) error {
 			q.Seq = p.seq.Next(q.Symbol)
 			if p.metrics != nil {
 				// Cardinality fix: only label by provider, never by symbol.
-				p.metrics.FeedMessagesReceived.
+				p.metrics.MessagesGeneratedTotal.
 					WithLabelValues(q.Provider).
 					Inc()
 				// Track data staleness: wall clock minus exchange timestamp.
 				p.metrics.DataStaleness.Set(time.Since(q.Timestamp).Seconds())
 			}
-			// Use context.Background() to break trace propagation on the hot path.
-			// The pipeline.start span is long-running (entire process lifetime).
-			// Passing its ctx to Publish would create a redis.publish child span
-			// for EVERY tick (100k+/sec), overwhelming the OTLP collector.
-			// Per-tick Redis publishes are not traced — only client-facing
-			// operations (subscription, replay, snapshot) are traced.
+
+			startPub := time.Now()
 			p.publisher.Publish(context.Background(), q)
+			if p.metrics != nil {
+				p.metrics.PublishDurationSeconds.Observe(time.Since(startPub).Seconds())
+			}
 
 			// Update liveness heartbeat to detect deadlocks.
 			// If this loop deadlocks, the heartbeat goes stale and

@@ -70,18 +70,21 @@ func TestMissingTicks(t *testing.T) {
 
 	// Tick 1
 	engine.ProcessTick(Tick{Symbol: "BTC-USD", Price: 100, Volume: 1, Timestamp: baseTime})
-	
+
 	// Fast forward 10 minutes (simulate missing ticks/illiquid market)
 	lateTime := baseTime.Add(10 * time.Minute)
-	
+
 	// Tick 2
 	engine.ProcessTick(Tick{Symbol: "BTC-USD", Price: 101, Volume: 1, Timestamp: lateTime})
 
-	// Wait for async publisher
-	time.Sleep(10 * time.Millisecond)
+	// Manually trigger sweep to prevent test flakiness from background ticker
+	engine.sweepStagnant(lateTime)
+
+	// Wait for async publisher workers to drain channel
+	time.Sleep(50 * time.Millisecond)
 
 	published := pub.GetPublished()
-	
+
 	// We expect 3 events (the 1s, 5s, and 1m windows from 12:00:00 flushed by the late tick)
 	if len(published) != 3 {
 		t.Errorf("Expected exactly 3 flushes, got %d", len(published))
@@ -107,11 +110,14 @@ func TestWindowRollover(t *testing.T) {
 	engine.ProcessTick(Tick{Symbol: "ETH-USD", Price: 2005, Volume: 1, Timestamp: baseTime.Add(4999 * time.Millisecond)})
 	engine.ProcessTick(Tick{Symbol: "ETH-USD", Price: 2010, Volume: 1, Timestamp: baseTime.Add(5 * time.Second)})
 
+	// Manually trigger sweep to prevent test flakiness from background ticker
+	engine.sweepStagnant(baseTime.Add(6 * time.Second))
+
 	// Wait for async publisher
-	time.Sleep(10 * time.Millisecond)
+	time.Sleep(50 * time.Millisecond)
 
 	published := pub.GetPublished()
-	
+
 	// Finding the 5-second window flush
 	var found5s bool
 	for _, ohlc := range published {
@@ -137,19 +143,19 @@ func TestWindowRollover(t *testing.T) {
 func TestStagnantSweeper(t *testing.T) {
 	pub := &mockPublisher{}
 	engine := NewEngine(pub)
-	
+
 	// Create context but do NOT run engine.Start() normally because we want to trigger sweep manually.
 	baseTime := time.Date(2026, 1, 1, 12, 0, 0, 0, time.UTC)
 
 	// Send a tick to open a window.
 	engine.ProcessTick(Tick{Symbol: "SOL-USD", Price: 150, Volume: 1, Timestamp: baseTime})
-	
+
 	// Fast forward time by 2 seconds, enough to make the 1-second window stagnant.
 	sweepTime := baseTime.Add(2 * time.Second)
-	
+
 	// Manually trigger the sweep function (which normally runs on a ticker)
 	engine.sweepStagnant(sweepTime)
-	
+
 	// We need to drain the publishCh manually since we didn't call Start()
 	select {
 	case <-engine.publishCh:

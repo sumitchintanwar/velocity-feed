@@ -24,7 +24,7 @@ func NewManager() *Manager {
 	}
 }
 
-// OnStartupComplete registers a callback that will be executed once all 
+// OnStartupComplete registers a callback that will be executed once all
 // components have successfully started.
 func (m *Manager) OnStartupComplete(hook func()) {
 	m.mu.Lock()
@@ -32,7 +32,7 @@ func (m *Manager) OnStartupComplete(hook func()) {
 	m.startupHooks = append(m.startupHooks, hook)
 }
 
-// Register adds a component to the lifecycle manager. 
+// Register adds a component to the lifecycle manager.
 // Registration order dictates Startup order. Shutdown will be strictly in reverse (LIFO).
 func (m *Manager) Register(c Component) {
 	m.mu.Lock()
@@ -41,7 +41,7 @@ func (m *Manager) Register(c Component) {
 }
 
 // StartAll iterates through registered components and starts them sequentially.
-// If any component fails to start, it halts the boot process and rolls back (Stops) 
+// If any component fails to start, it halts the boot process and rolls back (Stops)
 // any components that had already successfully started.
 func (m *Manager) StartAll(globalCtx context.Context, timeoutPerComponent time.Duration) error {
 	m.mu.Lock()
@@ -55,7 +55,7 @@ func (m *Manager) StartAll(globalCtx context.Context, timeoutPerComponent time.D
 		}
 
 		ctx, cancel := context.WithTimeout(globalCtx, effTimeout)
-		
+
 		errCh := make(chan error, 1)
 		go func(c Component) {
 			errCh <- c.Start(ctx)
@@ -67,7 +67,7 @@ func (m *Manager) StartAll(globalCtx context.Context, timeoutPerComponent time.D
 		case <-ctx.Done():
 			startErr = fmt.Errorf("component %s startup timed out: %w", comp.Name(), ctx.Err())
 		}
-		
+
 		cancel()
 
 		if startErr != nil {
@@ -101,7 +101,7 @@ func (m *Manager) rollbackUnlocked(globalCtx context.Context, timeoutPerComponen
 	// Iterate backwards over strictly what successfully started
 	for i := len(m.started) - 1; i >= 0; i-- {
 		comp := m.started[i]
-		
+
 		// Use custom timeout if provided by the component
 		effTimeout := timeoutPerComponent
 		if tc, ok := comp.(TimeoutComponent); ok {
@@ -109,7 +109,7 @@ func (m *Manager) rollbackUnlocked(globalCtx context.Context, timeoutPerComponen
 		}
 
 		ctx, cancel := context.WithTimeout(globalCtx, effTimeout)
-		
+
 		errCh := make(chan error, 1)
 		go func(c Component) {
 			errCh <- c.Stop(ctx)
@@ -121,7 +121,7 @@ func (m *Manager) rollbackUnlocked(globalCtx context.Context, timeoutPerComponen
 		case <-ctx.Done():
 			stopErr = fmt.Errorf("component %s shutdown timed out: %w", comp.Name(), ctx.Err())
 		}
-		
+
 		cancel()
 
 		if stopErr != nil {
@@ -133,7 +133,7 @@ func (m *Manager) rollbackUnlocked(globalCtx context.Context, timeoutPerComponen
 			}
 		}
 	}
-	
+
 	// Clear the started list since everything is shut down
 	m.started = m.started[:0]
 

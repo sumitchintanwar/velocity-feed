@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 const (
@@ -74,8 +74,8 @@ type symbolState struct {
 // lock contention during thundering-herd subscribe/unsubscribe storms.
 // Each shard protects a disjoint subset of symbols via FNV-1a hashing.
 type DistributedRouter struct {
-	local     Manager  // local topic manager for fan-out
-	prefix    string   // Redis channel prefix (default "market:")
+	local     Manager // local topic manager for fan-out
+	prefix    string  // Redis channel prefix (default "market:")
 	log       *log.Logger
 	gatewayID string
 
@@ -125,13 +125,13 @@ func routerHash(s string) uint64 {
 func NewDistributedRouter(local Manager, prefix string, l *log.Logger, gatewayID string, opts ...RouterOption) *DistributedRouter {
 	n := defaultRouterShards
 	r := &DistributedRouter{
-		local:      local,
-		prefix:     prefix,
-		log:        l,
-		gatewayID:  gatewayID,
-		shards:     make([]symbolShard, n),
-		shardMask:  uint64(n - 1),
-		subs:       make(map[ID][]Topic),
+		local:     local,
+		prefix:    prefix,
+		log:       l,
+		gatewayID: gatewayID,
+		shards:    make([]symbolShard, n),
+		shardMask: uint64(n - 1),
+		subs:      make(map[ID][]Topic),
 	}
 	for i := range r.shards {
 		r.shards[i].subs = make(map[string]*symbolState)
@@ -170,9 +170,22 @@ func (r *DistributedRouter) Subscribe(id ID, topics ...Topic) Handle {
 	// Delegate to local topic manager for client delivery.
 	h := r.local.Subscribe(id, topics...)
 
-	// Track subscriber topics.
+	// Track subscriber topics (merge, do not overwrite).
 	r.subsMu.Lock()
-	r.subs[id] = topics
+	existing := r.subs[id]
+	for _, t := range topics {
+		found := false
+		for _, e := range existing {
+			if e == t {
+				found = true
+				break
+			}
+		}
+		if !found {
+			existing = append(existing, t)
+		}
+	}
+	r.subs[id] = existing
 	r.subsMu.Unlock()
 
 	// Track local subscriber counts and manage Redis subscriptions.
@@ -316,9 +329,9 @@ func (r *DistributedRouter) Unsubscribe(id ID) {
 				st.redisSub.Store(false)
 				shard.count--
 				r.activeRedisSubs.Add(-1)
-			r.log.Underlying().Info().Str("symbol", topic).Str("gateway", r.gatewayID).
-				Str("event", "redis_unsubscribe_requested").
-				Msg("distributed: last subscriber left → unsubscribing from Redis")
+				r.log.Underlying().Info().Str("symbol", topic).Str("gateway", r.gatewayID).
+					Str("event", "redis_unsubscribe_requested").
+					Msg("distributed: last subscriber left → unsubscribing from Redis")
 				toUnsubscribe = append(toUnsubscribe, topic)
 			}
 			shard.mu.Unlock()
@@ -379,9 +392,9 @@ func (r *DistributedRouter) Reconcile() {
 				st.redisSub.Store(true)
 				shard.count++
 				r.activeRedisSubs.Add(1)
-			r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
-				Str("event", "reconcile_resubscribe").
-				Msg("distributed: reconciliation — re-subscribing to Redis")
+				r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
+					Str("event", "reconcile_resubscribe").
+					Msg("distributed: reconciliation — re-subscribing to Redis")
 				shard.mu.Unlock()
 				r.fireOnChange(sym, SubscribeRequested)
 				shard.mu.Lock()
@@ -391,9 +404,9 @@ func (r *DistributedRouter) Reconcile() {
 				st.redisSub.Store(false)
 				shard.count--
 				r.activeRedisSubs.Add(-1)
-			r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
-				Str("event", "reconcile_unsubscribe").
-				Msg("distributed: reconciliation — re-unsubscribing from Redis")
+				r.log.Underlying().Warn().Str("symbol", sym).Str("gateway", r.gatewayID).
+					Str("event", "reconcile_unsubscribe").
+					Msg("distributed: reconciliation — re-unsubscribing from Redis")
 				shard.mu.Unlock()
 				r.fireOnChange(sym, UnsubscribeRequested)
 				shard.mu.Lock()

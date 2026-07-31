@@ -17,7 +17,7 @@ type SetLogLevelCommand struct {
 
 func (c *SetLogLevelCommand) Execute(ctx context.Context) error {
 	req := strings.ToLower(strings.TrimSpace(c.Requested))
-	
+
 	var newLevel zapcore.Level
 	switch req {
 	case "debug":

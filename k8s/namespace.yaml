@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rtmds
+  labels:
+    app: rtmds
+    environment: production

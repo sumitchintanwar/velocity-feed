@@ -53,7 +53,7 @@ func (mgr *Manager) Start(ctx context.Context) {
 }
 
 func (mgr *Manager) poll(stats *runtime.MemStats) {
-	// ReadMemStats stops the world very briefly. 
+	// ReadMemStats stops the world very briefly.
 	// Doing this in a low-frequency background loop is standard and safe.
 	runtime.ReadMemStats(stats)
 

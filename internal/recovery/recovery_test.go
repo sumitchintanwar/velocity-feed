@@ -22,12 +22,12 @@ func TestRecoveryManager_StateTransitions(t *testing.T) {
 		t.Fatal("should not be ready initially")
 	}
 
-	rm.SetState(context.Background(),StateLoading, "test")
+	rm.SetState(context.Background(), StateLoading, "test")
 	if rm.State() != StateLoading {
 		t.Fatalf("expected loading state, got %v", rm.State())
 	}
 
-	rm.SetState(context.Background(),StateReady, "done")
+	rm.SetState(context.Background(), StateReady, "done")
 	if !rm.IsReady() {
 		t.Fatal("should be ready after StateReady")
 	}
@@ -43,12 +43,12 @@ func TestRecoveryManager_Dependencies(t *testing.T) {
 		t.Fatal("should not be ready with unregistered deps")
 	}
 
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 	if rm.AllDependenciesReady() {
 		t.Fatal("should not be ready with only one dep")
 	}
 
-	rm.DependencyReady(context.Background(),"database")
+	rm.DependencyReady(context.Background(), "database")
 	if !rm.AllDependenciesReady() {
 		t.Fatal("should be ready when all deps are ready")
 	}
@@ -74,7 +74,7 @@ func TestRecoveryManager_WaitForDependencies(t *testing.T) {
 	}
 
 	// Mark ready.
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 
 	select {
 	case err := <-done:
@@ -114,7 +114,7 @@ func TestRecoveryManager_WaitForDependencies_ContextCancelled(t *testing.T) {
 func TestRecoveryManager_Recover(t *testing.T) {
 	rm := New()
 	rm.RegisterDependency("redis")
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 
 	var recovered atomic.Bool
 	err := rm.Recover(context.Background(), func(ctx context.Context) error {
@@ -135,7 +135,7 @@ func TestRecoveryManager_Recover(t *testing.T) {
 func TestRecoveryManager_Recover_FunctionError(t *testing.T) {
 	rm := New()
 	rm.RegisterDependency("redis")
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 
 	err := rm.Recover(context.Background(), func(ctx context.Context) error {
 		return errors.New("db unavailable")
@@ -154,7 +154,7 @@ func TestRecoveryManager_StatePersistence(t *testing.T) {
 
 	rm := New(WithStatePath(statePath))
 	rm.RegisterDependency("redis")
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 
 	// Run recovery to trigger state persistence.
 	err := rm.Recover(context.Background(), func(ctx context.Context) error { return nil })
@@ -184,9 +184,9 @@ func TestRecoveryManager_StatePersistence(t *testing.T) {
 func TestRecoveryManager_Report(t *testing.T) {
 	rm := New()
 	rm.RegisterDependency("redis")
-	rm.DependencyReady(context.Background(),"redis")
+	rm.DependencyReady(context.Background(), "redis")
 
-	rm.SetState(context.Background(),StateReady, "test")
+	rm.SetState(context.Background(), StateReady, "test")
 
 	report := rm.Report()
 	if report.State != "ready" {

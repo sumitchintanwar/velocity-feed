@@ -9,7 +9,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/backpressure"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func testEvent(symbol string, price float64) marketdata.MarketEvent {
@@ -109,11 +109,11 @@ func TestQueue_DropNewest(t *testing.T) {
 func TestQueue_Disconnect(t *testing.T) {
 	var disconnected atomic.Bool
 	cfg := Config{
-		QueueSize:            1,
-		Policy:               backpressure.PolicyDisconnect,
-		MaxConsecutiveDrops:  5,
-		DropWindow:           time.Second,
-		DropThreshold:        0.9,
+		QueueSize:           1,
+		Policy:              backpressure.PolicyDisconnect,
+		MaxConsecutiveDrops: 5,
+		DropWindow:          time.Second,
+		DropThreshold:       0.9,
 	}
 	q := New("client-1", cfg, testLogger(), testRegistry(), func(reason string) {
 		disconnected.Store(true)
@@ -156,11 +156,11 @@ func TestQueue_CloseIdempotent(t *testing.T) {
 
 func TestQueue_ResetDrops(t *testing.T) {
 	cfg := Config{
-		QueueSize:            1,
-		Policy:               backpressure.PolicyDisconnect,
-		MaxConsecutiveDrops:  10,
-		DropWindow:           time.Second,
-		DropThreshold:        0.9,
+		QueueSize:           1,
+		Policy:              backpressure.PolicyDisconnect,
+		MaxConsecutiveDrops: 10,
+		DropWindow:          time.Second,
+		DropThreshold:       0.9,
 	}
 	q := New("client-1", cfg, testLogger(), testRegistry(), nil)
 	defer q.Close()

@@ -5,7 +5,7 @@ package config
 type Config struct {
 	// Enabled determines if metrics collection and the exporter endpoint are active.
 	Enabled bool
-	
+
 	// Namespace is used as a global prefix for all metrics (e.g., "marketdata").
 	Namespace string
 

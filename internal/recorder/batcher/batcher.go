@@ -39,7 +39,7 @@ func NewBatcher(maxSize int, flushRate time.Duration, process BatchProcessor) *B
 
 // Add appends an event to the batcher queue in a non-blocking way.
 func (b *Batcher) Add(ev models.StoredEvent) {
-	// If channel is completely full, we could drop or block. 
+	// If channel is completely full, we could drop or block.
 	// For recording, blocking applies backpressure to the ingestion pipeline.
 	b.eventCh <- ev
 }
@@ -71,7 +71,7 @@ func (b *Batcher) Start(ctx context.Context) {
 				buffer = append(buffer, ev)
 				if len(buffer) >= b.maxSize {
 					b.dispatchProcess(ctx, buffer)
-					
+
 					// Acquire new buffer for next batch
 					bufferPtr = b.pool.Get().(*[]models.StoredEvent)
 					buffer = *bufferPtr
@@ -80,7 +80,7 @@ func (b *Batcher) Start(ctx context.Context) {
 			case <-ticker.C:
 				if len(buffer) > 0 {
 					b.dispatchProcess(ctx, buffer)
-					
+
 					bufferPtr = b.pool.Get().(*[]models.StoredEvent)
 					buffer = *bufferPtr
 				}

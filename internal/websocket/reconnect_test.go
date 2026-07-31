@@ -9,8 +9,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // --- Backoff tests ---
@@ -366,7 +366,7 @@ func TestReconnectClient_StopDuringReconnect(t *testing.T) {
 
 	_ = rc.Start()
 	time.Sleep(30 * time.Millisecond) // let it attempt a few reconnects
-	rc.Stop()                          // should not deadlock
+	rc.Stop()                         // should not deadlock
 }
 
 func TestReconnectClient_EventsChannelClosed(t *testing.T) {
@@ -385,12 +385,24 @@ func TestReconnectClient_EventsChannelClosed(t *testing.T) {
 	rc.Stop()
 
 	// Events channel should be closed after Stop.
-	select {
-	case _, ok := <-rc.Events():
-		if ok {
-			t.Error("expected events channel to be closed")
+	closed := false
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		select {
+		case _, ok := <-rc.Events():
+			if !ok {
+				closed = true
+				break
+			}
+			// Drain any pending messages (e.g. "subscribed")
+		default:
+			time.Sleep(10 * time.Millisecond)
 		}
-	case <-time.After(2 * time.Second):
+		if closed {
+			break
+		}
+	}
+	if !closed {
 		t.Fatal("timed out waiting for events channel to close")
 	}
 }

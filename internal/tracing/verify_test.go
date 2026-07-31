@@ -149,9 +149,9 @@ func TestTracePropagation_ComponentScopes(t *testing.T) {
 	defer shutdown(context.Background())
 
 	components := []struct {
-		name   string
-		span   string
-		kind   trace.SpanKind
+		name string
+		span string
+		kind trace.SpanKind
 	}{
 		{"redis", "redis.publish", trace.SpanKindProducer},
 		{"redis", "redis.consume", trace.SpanKindConsumer},
@@ -259,27 +259,27 @@ func TestSpanAttributes_LowCardinality(t *testing.T) {
 	defer shutdown(context.Background())
 
 	forbidden := map[string]bool{
-		"symbol":      true,
-		"price":       true,
-		"volume":      true,
-		"bid":         true,
-		"ask":         true,
-		"session_id":  true,
-		"client_id":   false, // client.id is allowed on websocket.connect
+		"symbol":     true,
+		"price":      true,
+		"volume":     true,
+		"bid":        true,
+		"ask":        true,
+		"session_id": true,
+		"client_id":  false, // client.id is allowed on websocket.connect
 	}
 
 	allowed := map[string]bool{
-		"service.name":       true,
-		"environment":        true,
-		"region":             true,
-		"gateway.id":         true,
-		"redis.channel":      true,
-		"redis.operation":    true,
-		"db.system":          true,
-		"db.operation":       true,
-		"db.sql.table":       true,
-		"snapshot.hit":       true,
-		"replay.symbol":      true,
+		"service.name":              true,
+		"environment":               true,
+		"region":                    true,
+		"gateway.id":                true,
+		"redis.channel":             true,
+		"redis.operation":           true,
+		"db.system":                 true,
+		"db.operation":              true,
+		"db.sql.table":              true,
+		"snapshot.hit":              true,
+		"replay.symbol":             true,
 		"subscription.symbol_count": true,
 	}
 

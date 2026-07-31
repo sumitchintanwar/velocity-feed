@@ -23,10 +23,10 @@ import (
 type Bucket struct {
 	mu sync.Mutex
 
-	tokens     float64
-	burstSize  float64
+	tokens       float64
+	burstSize    float64
 	tokensPerSec float64
-	lastRefill time.Time
+	lastRefill   time.Time
 }
 
 // NewBucket creates a token bucket with the given rate and burst capacity.

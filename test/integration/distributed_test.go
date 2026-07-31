@@ -17,9 +17,9 @@ import (
 	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/distribution/redisbus"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 var testPrefixCounter atomic.Int64
@@ -364,7 +364,7 @@ func TestWebSocketCrossGateway(t *testing.T) {
 						if ev == nil {
 							return
 						}
-						_ = conn.WriteMessage(websocket.TextMessage, ev.EncodedMsg)
+						_ = conn.WriteMessage(websocket.TextMessage, ev.JSON)
 					case <-h.Done():
 						return
 					}

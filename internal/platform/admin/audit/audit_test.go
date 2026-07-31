@@ -13,7 +13,7 @@ func TestZapAuditLogger_Record(t *testing.T) {
 	// Setup zap observer to capture logs in memory
 	core, logs := observer.New(zap.InfoLevel)
 	zapLogger := zap.New(core)
-	
+
 	auditLogger := NewZapAuditLogger(zapLogger)
 
 	event := Event{

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // ---------- LatencyCollector ----------
@@ -254,11 +254,11 @@ func TestPool_Run_MockServer(t *testing.T) {
 	addr := fmt.Sprintf("ws://%s/ws", listener.Addr().String())
 
 	cfg := Config{
-		ServerURL:       addr,
-		Connections:     5,
-		Symbols:         []string{"AAPL"},
-		Duration:        2 * time.Second,
-		ReportInterval:  500 * time.Millisecond,
+		ServerURL:      addr,
+		Connections:    5,
+		Symbols:        []string{"AAPL"},
+		Duration:       2 * time.Second,
+		ReportInterval: 500 * time.Millisecond,
 	}
 
 	pool := NewPool(cfg)

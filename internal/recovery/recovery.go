@@ -324,10 +324,10 @@ func (r *RecoveryManager) loadState(ctx context.Context) error {
 
 // RecoveryReport returns a summary of the recovery process.
 type RecoveryReport struct {
-	State        string        `json:"state"`
-	RecoveryCnt  int           `json:"recovery_count"`
-	StartedAt    time.Time     `json:"started_at"`
-	Duration     time.Duration `json:"duration"`
+	State        string          `json:"state"`
+	RecoveryCnt  int             `json:"recovery_count"`
+	StartedAt    time.Time       `json:"started_at"`
+	Duration     time.Duration   `json:"duration"`
 	Dependencies map[string]bool `json:"dependencies"`
 }
 

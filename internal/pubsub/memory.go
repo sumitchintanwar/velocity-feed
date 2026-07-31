@@ -6,8 +6,8 @@ import (
 	"sync/atomic"
 
 	"github.com/rs/zerolog"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 const channelBuffer = 256
@@ -160,10 +160,10 @@ func (b *MemoryBus) Publish(ctx context.Context, event marketdata.MarketEvent) {
 	}
 
 	if sent > 0 {
-		b.metrics.BroadcastsTotal.Add(float64(sent))
+		b.metrics.MessagesPublishedTotal.Add(float64(sent))
 	}
-	if dropped > 0 {
-		b.metrics.EventsDroppedTotal.Add(float64(dropped))
+	if dropped > 0 && b.metrics != nil {
+		b.metrics.DroppedMessagesTotal.Add(float64(dropped))
 	}
 }
 

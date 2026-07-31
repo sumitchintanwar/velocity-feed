@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/exchange"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/normalization"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Purpose: Mock adapter representing a TCP/ITCH-style NASDAQ equity feed.

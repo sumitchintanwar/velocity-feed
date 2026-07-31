@@ -27,7 +27,7 @@ func Audit(logger audit.Logger, actionName string, targetService string) func(ht
 
 			// Wrap the writer to capture the response status
 			rw := &responseWriter{ResponseWriter: w, status: http.StatusOK}
-			
+
 			// Capture source IP (handles proxies if present, simplified for local)
 			sourceIp := r.RemoteAddr
 			if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
@@ -37,7 +37,7 @@ func Audit(logger audit.Logger, actionName string, targetService string) func(ht
 			// Generate correlation ID or extract it from headers/context
 			reqID := r.Header.Get("X-Request-ID")
 			corrID := r.Header.Get("X-Correlation-ID")
-			
+
 			// Serve the request
 			next.ServeHTTP(rw, r)
 

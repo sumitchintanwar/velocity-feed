@@ -35,9 +35,9 @@ type OHLC struct {
 
 // VWAP represents the continuously updating Volume-Weighted Average Price.
 type VWAP struct {
-	Symbol     string
-	Start      time.Time
-	End        time.Time // Set when the window is flushed
+	Symbol                string
+	Start                 time.Time
+	End                   time.Time // Set when the window is flushed
 	CumulativePriceVolume float64
 	CumulativeVolume      float64
 	VWAP                  float64

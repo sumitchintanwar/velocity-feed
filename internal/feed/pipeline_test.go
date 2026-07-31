@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/sequencer"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // --- Mock Feed ---
@@ -32,7 +32,7 @@ func newMockFeed(err error) *mockFeed {
 
 func (f *mockFeed) Name() string { return f.name }
 
-func (f *mockFeed) Subscribe(symbols ...string) error { return nil }
+func (f *mockFeed) Subscribe(symbols ...string) error   { return nil }
 func (f *mockFeed) Unsubscribe(symbols ...string) error { return nil }
 
 func (f *mockFeed) Run(ctx context.Context) (<-chan marketdata.Quote, error) {

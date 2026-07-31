@@ -10,9 +10,9 @@ import (
 
 // Metrics encapsulates all operational health indicators for stream integrity.
 type Metrics struct {
-	SequenceGapsTotal       interfaces.Counter
-	DroppedMessagesTotal    interfaces.Counter
-	RecoveryAttemptsTotal   interfaces.Counter
+	SequenceGapsTotal     interfaces.Counter
+	DroppedMessagesTotal  interfaces.Counter
+	RecoveryAttemptsTotal interfaces.Counter
 }
 
 // NewMetrics instantiates and registers the Reliability metric group.

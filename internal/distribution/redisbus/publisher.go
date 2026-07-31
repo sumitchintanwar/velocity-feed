@@ -15,34 +15,16 @@ import (
 	"fmt"
 	"sync"
 	"sync/atomic"
-	"time"
 
-	jsoniter "github.com/json-iterator/go"
 	"github.com/redis/go-redis/v9"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/tracing"
+	"github.com/sumit/rtmds/pkg/marketdata"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
 
-var jsonLib = jsoniter.ConfigCompatibleWithStandardLibrary
-
-// ChannelPrefix is the prefix for per-symbol Redis Pub/Sub channels.
-// Each symbol gets its own channel: "market:AAPL", "market:MSFT", etc.
 const ChannelPrefix = "market:"
-
-// wireEnvelope is the serialization format for events sent over Redis.
-// TraceCtx carries the W3C trace context from the producer, enabling the
-// subscriber to reconstruct the parent span and create a distributed trace.
-type wireEnvelope struct {
-	Symbol    string               `json:"symbol"`
-	Type      string               `json:"type"`
-	Seq       int64                `json:"seq,omitempty"`
-	Timestamp time.Time            `json:"timestamp,omitempty"`
-	Raw       jsoniter.RawMessage  `json:"raw"`
-	TraceCtx  tracing.TraceCarrier `json:"trace_ctx,omitempty"`
-}
 
 // publishRequest is an internal message queued for async delivery.
 type publishRequest struct {
@@ -123,9 +105,9 @@ func (p *Publisher) worker(id int) {
 
 	for req := range p.queue {
 		batch = append(batch, req)
-		
+
 		// Drain queue up to batch size limit
-		drain:
+	drain:
 		for len(batch) < 128 {
 			select {
 			case nextReq, ok := <-p.queue:
@@ -143,7 +125,7 @@ func (p *Publisher) worker(id int) {
 		} else {
 			p.doPublishBatch(batch)
 		}
-		
+
 		// Clear batch without reallocating
 		batch = batch[:0]
 	}
@@ -182,11 +164,13 @@ func (p *Publisher) Publish(ctx context.Context, event marketdata.MarketEvent) {
 	// Encode as a CachedEvent directly so we don't have to re-encode it at the gateway.
 	ce := marketdata.NewCachedEvent(event)
 
-	env := wireEnvelope{
-		Symbol:   event.EventSymbol(),
-		Type:     event.EventType(),
-		Raw:      ce.EncodedMsg,
-		TraceCtx: tracing.InjectTraceContext(ctx),
+	env := &wireEnvelope{
+		Symbol:      event.EventSymbol(),
+		Type:        event.EventType(),
+		JSON:        ce.JSON,
+		Protobuf:    ce.Protobuf,
+		FlatBuffers: ce.FlatBuffers,
+		TraceCtx:    tracing.InjectTraceContext(ctx),
 	}
 
 	// Populate sequence and timestamp if available
@@ -197,7 +181,7 @@ func (p *Publisher) Publish(ctx context.Context, event marketdata.MarketEvent) {
 		env.Timestamp = tsEv.GetTimestamp()
 	}
 
-	payload, err := jsonLib.Marshal(env)
+	payload, err := env.MarshalBinary()
 	if err != nil {
 		p.log.Underlying().Warn().Err(err).Str("event", "envelope_marshal_failed").
 			Msg("redis-publisher: failed to marshal envelope")
@@ -254,7 +238,7 @@ func (p *Publisher) Close() {
 		return // already closed
 	}
 	close(p.queue) // signal workers to drain and exit
-	p.wg.Wait()   // block until all workers finish
+	p.wg.Wait()    // block until all workers finish
 	close(p.doneCh)
 }
 

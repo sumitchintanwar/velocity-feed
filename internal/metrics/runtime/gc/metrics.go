@@ -16,9 +16,9 @@ type Metrics struct {
 	// We can't perfectly track pause as a histogram via background polling without hooking into runtime trace,
 	// but we can track the total pause time and derive it. For now we just track absolute pause total.
 	PauseTotalSeconds interfaces.Gauge
-	
+
 	PauseSeconds interfaces.Histogram // New accurate histogram
-	lastNumGC    uint32             // Tracks the last processed GC cycle
+	lastNumGC    uint32               // Tracks the last processed GC cycle
 }
 
 // NewMetrics instantiates and registers the runtime GC metric group.

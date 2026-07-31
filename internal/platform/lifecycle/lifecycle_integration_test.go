@@ -24,11 +24,11 @@ func TestIntegration_HTTPGracefulDrain(t *testing.T) {
 	mux.HandleFunc("/slow", func(w http.ResponseWriter, r *http.Request) {
 		activeRequests.Add(1)
 		defer activeRequests.Done()
-		
+
 		handlerEnteredOnce.Do(func() {
 			close(handlerEntered)
 		})
-		
+
 		// Simulate a long 500ms database transaction
 		time.Sleep(500 * time.Millisecond)
 		w.WriteHeader(http.StatusOK)
@@ -44,7 +44,7 @@ func TestIntegration_HTTPGracefulDrain(t *testing.T) {
 	m.Register(httpAdapter)
 
 	ctx := context.Background()
-	
+
 	// Start the server
 	if err := m.StartAll(ctx, 2*time.Second); err != nil {
 		t.Fatalf("failed to start http adapter: %v", err)
@@ -120,7 +120,7 @@ func TestIntegration_TimeoutEnforcement(t *testing.T) {
 
 	// Trigger shutdown with a STRICT 50ms timeout!
 	err := m.StopAll(ctx, 50*time.Millisecond)
-	
+
 	if err == nil {
 		t.Fatalf("expected a timeout error from StopAll, but got nil")
 	}

@@ -39,7 +39,7 @@ func (b *OrderBook) Apply(inc OrderBookIncrement) error {
 }
 
 // applyLevel handles the sorting and binary search logic for a single side.
-	// Bids are sorted descending (highest price first).
+// Bids are sorted descending (highest price first).
 // Asks are sorted ascending (lowest price first).
 func applyLevel(levels []PriceLevel, update LevelUpdate, isBid bool) []PriceLevel {
 	// Auto-cast update to size 0 as delete
@@ -52,12 +52,12 @@ func applyLevel(levels []PriceLevel, update LevelUpdate, isBid bool) []PriceLeve
 	if isBid {
 		// Bids: descending
 		idx = sort.Search(len(levels), func(i int) bool {
-			return levels[i].Price <= update.Price + epsilon
+			return levels[i].Price <= update.Price+epsilon
 		})
 	} else {
 		// Asks: ascending
 		idx = sort.Search(len(levels), func(i int) bool {
-			return levels[i].Price >= update.Price - epsilon
+			return levels[i].Price >= update.Price-epsilon
 		})
 	}
 
@@ -70,14 +70,15 @@ func applyLevel(levels []PriceLevel, update LevelUpdate, isBid bool) []PriceLeve
 			levels[idx].Quantity = update.Size
 		} else {
 			// Insert at idx (shifts elements right)
-			// Optimize allocation by appending zero and shifting
-			levels = append(levels, PriceLevel{})
-			copy(levels[idx+1:], levels[idx:])
-			levels[idx] = PriceLevel{Price: update.Price, Quantity: update.Size}
-			
-			if len(levels) > MaxDepth {
-				levels = levels[:MaxDepth]
+			// Optimize allocation by avoiding append if we've reached capacity/depth
+			if len(levels) < MaxDepth {
+				levels = append(levels, PriceLevel{})
 			}
+			
+			if idx < len(levels)-1 {
+				copy(levels[idx+1:], levels[idx:len(levels)-1])
+			}
+			levels[idx] = PriceLevel{Price: update.Price, Quantity: update.Size}
 		}
 	case ActionDelete:
 		if exists {

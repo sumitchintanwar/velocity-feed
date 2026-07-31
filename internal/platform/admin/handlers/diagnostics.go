@@ -31,7 +31,7 @@ func (h *DiagnosticsHandler) HandleGoroutines(w http.ResponseWriter, r *http.Req
 func (h *DiagnosticsHandler) HandleMemory(w http.ResponseWriter, r *http.Request) {
 	h.mu.Lock()
 	now := time.Now()
-	
+
 	// Cache for 1 second to prevent "stop-the-world" spam from degrading system performance
 	if h.cachedMem == nil || now.Sub(h.lastMemCheck) > time.Second {
 		var m runtime.MemStats

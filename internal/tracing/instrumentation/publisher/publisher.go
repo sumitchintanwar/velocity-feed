@@ -27,23 +27,23 @@ func NewTracer(f *factory.Factory) Tracer {
 // StartSerializeSpan initiates an Internal span for event serialization.
 func (t *tracerImpl) StartSerializeSpan(ctx context.Context, topic string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "publisher", "serialize", trace.SpanKindInternal)
-	
+
 	span.SetAttributes(
 		attributes.Topic(topic),
 	)
-	
+
 	return spanCtx, span
 }
 
 // StartRedisPublishSpan initiates a Producer span for writing an event to Redis.
 func (t *tracerImpl) StartRedisPublishSpan(ctx context.Context, topic string) (context.Context, trace.Span) {
 	spanCtx, span := t.f.StartSpanWithKind(ctx, "publisher", "redis.publish", trace.SpanKindProducer)
-	
+
 	span.SetAttributes(
 		attributes.Topic(topic),
 		attributes.MessagingSystem("redis"),
 	)
-	
+
 	return spanCtx, span
 }
 

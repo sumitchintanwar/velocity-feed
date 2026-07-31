@@ -173,26 +173,43 @@ func (r *PostgresRepository) AppendBatch(ctx context.Context, events []*StoredEv
 		prepared[i] = preparedEvent{store: event, raw: rawJSON}
 	}
 
-	var ids []int64
-	for attempt := 0; attempt <= maxRetries; attempt++ {
-		if attempt > 0 {
-			time.Sleep(time.Duration(attempt) * 50 * time.Millisecond)
+	var allIDs []int64
+	chunkSize := 5000
+
+	for i := 0; i < len(prepared); i += chunkSize {
+		end := i + chunkSize
+		if end > len(prepared) {
+			end = len(prepared)
+		}
+		chunk := prepared[i:end]
+
+		var chunkIDs []int64
+		var err error
+		for attempt := 0; attempt <= maxRetries; attempt++ {
+			if attempt > 0 {
+				time.Sleep(time.Duration(attempt) * 50 * time.Millisecond)
+			}
+
+			chunkIDs, err = r.insertBatch(ctx, chunk)
+			if err == nil {
+				break
+			}
+			if !isRetryable(err) {
+				break
+			}
 		}
 
-		var err error
-		ids, err = r.insertBatch(ctx, prepared)
-		if err == nil {
-			span.SetAttributes(attribute.Int("db.row_count", len(ids)))
-			return ids, nil
+		if err != nil {
+			retryErr := fmt.Errorf("chunk insert failed after %d retries: %w", maxRetries, err)
+			span.RecordError(retryErr)
+			return allIDs, fmt.Errorf("eventlog: append batch: %w", retryErr)
 		}
-		if !isRetryable(err) {
-			break
-		}
+
+		allIDs = append(allIDs, chunkIDs...)
 	}
 
-	retryErr := fmt.Errorf("all %d retries exhausted", maxRetries)
-	span.RecordError(retryErr)
-	return nil, fmt.Errorf("eventlog: append batch: %w", retryErr)
+	span.SetAttributes(attribute.Int("db.row_count", len(allIDs)))
+	return allIDs, nil
 }
 
 // insertBatch performs a single bulk INSERT within a transaction.

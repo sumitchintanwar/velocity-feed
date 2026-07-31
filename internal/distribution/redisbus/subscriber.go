@@ -8,9 +8,10 @@ import (
 
 	"github.com/redis/go-redis/v9"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/tracing"
+	"github.com/sumit/rtmds/pkg/marketdata"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -31,12 +32,13 @@ import (
 //	Unsubscribe(sym) → unsubscribes when no local clients need the symbol
 //	Stop()           → graceful shutdown, waits for in-flight messages
 type Subscriber struct {
-	client  *redis.Client
-	prefix  string
-	tm      topicmanager.Manager
-	log     *log.Logger
-	cancel  context.CancelFunc
-	doneCh  chan struct{}
+	client *redis.Client
+	prefix string
+	tm     topicmanager.Manager
+	log    *log.Logger
+	metrics *platform.Metrics // optional; nil disables instrumentation
+	cancel context.CancelFunc
+	doneCh chan struct{}
 
 	// Channel management.
 	channels   map[string]struct{} // symbols we're subscribed to
@@ -54,10 +56,10 @@ type Subscriber struct {
 	// Stale data protection: tracks when the last message was received.
 	// If no message arrives within StaleThreshold, the OnStale callback
 	// is invoked so the gateway can notify or disconnect clients.
-	lastMessageAt   atomic.Int64 // unix nanoseconds
-	staleOnce       sync.Once
-	onStale         func()        // called once when staleness detected
-	staleThreshold  time.Duration // max time without messages before declaring stale
+	lastMessageAt  atomic.Int64 // unix nanoseconds
+	staleOnce      sync.Once
+	onStale        func()        // called once when staleness detected
+	staleThreshold time.Duration // max time without messages before declaring stale
 }
 
 // SubscriberOption configures the Subscriber.
@@ -66,6 +68,11 @@ type SubscriberOption func(*Subscriber)
 // WithSubscriberPrefix overrides the default channel prefix ("market:").
 func WithSubscriberPrefix(prefix string) SubscriberOption {
 	return func(s *Subscriber) { s.prefix = prefix }
+}
+
+// WithMetrics provides Prometheus metrics for the subscriber.
+func WithMetrics(m *platform.Metrics) SubscriberOption {
+	return func(s *Subscriber) { s.metrics = m }
 }
 
 // WithStaleCallback registers a callback invoked once when no message
@@ -320,7 +327,7 @@ func (s *Subscriber) IsStale() bool {
 // creates a distributed trace: Pipeline → redis.publish → redis.consume → Client.
 func (s *Subscriber) handleMessage(ctx context.Context, payload string, channel string) {
 	var env wireEnvelope
-	if err := jsonLib.Unmarshal([]byte(payload), &env); err != nil {
+	if err := env.UnmarshalBinary([]byte(payload)); err != nil {
 		s.log.Underlying().Warn().Err(err).Str("event", "envelope_unmarshal_failed").
 			Msg("redis-subscriber: failed to unmarshal envelope")
 		return
@@ -340,17 +347,23 @@ func (s *Subscriber) handleMessage(ctx context.Context, payload string, channel 
 	)
 	defer span.End()
 
-	// Reconstruct the event from the raw JSON envelope, without parsing the inner marketdata JSON.
+	// Reconstruct the event from the binary envelope.
 	// This maintains the zero-copy optimization for the Gateway.
 	event := marketdata.PreEncodedEvent{
-		Symbol:     env.Symbol,
-		Typ:        env.Type,
-		SeqNum:     env.Seq,
-		Time:       env.Timestamp,
-		EncodedMsg: env.Raw,
+		Symbol:      env.Symbol,
+		Typ:         env.Type,
+		SeqNum:      env.Seq,
+		Time:        env.Timestamp,
+		JSON:        env.JSON,
+		Protobuf:    env.Protobuf,
+		FlatBuffers: env.FlatBuffers,
 	}
 
 	s.received.Add(1)
+
+	if s.metrics != nil {
+		s.metrics.RedisReceiveLatencySeconds.Observe(time.Since(env.Timestamp).Seconds())
+	}
 
 	s.tm.Publish(ctx, event)
 }

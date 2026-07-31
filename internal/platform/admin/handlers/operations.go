@@ -30,7 +30,7 @@ func (h *OperationsHandler) HandleDispatch(w http.ResponseWriter, r *http.Reques
 	}
 
 	cmdName, err := h.bus.DispatchByPath(r.Context(), path, payload)
-	
+
 	w.Header().Set("Content-Type", "application/json")
 	if err != nil {
 		if strings.Contains(err.Error(), "no command registered") {

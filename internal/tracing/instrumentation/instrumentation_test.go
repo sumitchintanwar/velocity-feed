@@ -17,7 +17,7 @@ import (
 func TestInstrumentationPhase1(t *testing.T) {
 	// Use NoopTracer so tests run without panic and without backend overhead
 	otel.SetTracerProvider(trace.NewNoopTracerProvider())
-	
+
 	f := factory.New()
 	ctx := context.Background()
 

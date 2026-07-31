@@ -13,11 +13,11 @@ func (d *discardPublisher) PublishVWAP(vwap VWAP) {}
 
 func BenchmarkEngineProcessTick(b *testing.B) {
 	engine := NewEngine(&discardPublisher{})
-	
+
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	engine.Start(ctx)
-	
+
 	tick := Tick{
 		Symbol:    "BTC-USD",
 		Price:     100.0,

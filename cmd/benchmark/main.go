@@ -111,11 +111,11 @@ func (h *HighResHistogram) Print() {
 
 	fmt.Println("  Latency Distribution (High Res):")
 	buckets := []float64{0.1, 0.5, 1, 5, 10, 50, 100, 500, 1000}
-	
+
 	fmt.Printf("    %10s  %6s %s\n", "Range", "Count", "Percent")
 	cumulative := 0
 	lastBucket := 0.0
-	
+
 	for _, b := range buckets {
 		count := 0
 		startIdx := int(lastBucket / HighResPrecisionMs)
@@ -133,7 +133,7 @@ func (h *HighResHistogram) Print() {
 		}
 		lastBucket = b
 	}
-	
+
 	overflow := h.Total - cumulative
 	if overflow > 0 && h.Total > 0 {
 		pct := float64(overflow) / float64(h.Total) * 100
@@ -352,7 +352,7 @@ func parseFlags() *BenchmarkConfig {
 }
 
 func checkHealth(wsURL string) bool {
-	httpURL := "http" + wsURL[2:] // ws:// -> http://
+	httpURL := "http" + wsURL[2:]      // ws:// -> http://
 	httpURL = httpURL[:len(httpURL)-3] // remove /ws
 	client := &http.Client{Timeout: 2 * time.Second}
 	resp, err := client.Get(httpURL + "/health")
@@ -386,14 +386,14 @@ func generateSymbols(n int) []string {
 	symbols := []string{"AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "JNJ",
 		"WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM", "CSCO", "VZ",
 		"INTC", "KO", "CVX", "MRK", "PFE", "TMO", "ABT", "COST", "AVGO", "NKE"}
-	
+
 	// Zipfian distribution simulation
 	// 50% chance to pick from top 3
 	// 30% chance to pick from next 7
 	// 20% chance to pick from remainder
 	selected := make(map[string]bool)
 	var result []string
-	
+
 	for len(result) < n && len(result) < len(symbols) {
 		r := rand.Float64()
 		var idx int
@@ -404,7 +404,7 @@ func generateSymbols(n int) []string {
 		} else {
 			idx = 10 + rand.Intn(len(symbols)-10)
 		}
-		
+
 		sym := symbols[idx]
 		if !selected[sym] {
 			selected[sym] = true
@@ -582,13 +582,13 @@ func generateResult(config *BenchmarkConfig, duration time.Duration, startTime t
 		if endIdx > HighResBuckets {
 			endIdx = HighResBuckets
 		}
-		
+
 		latencyHist.mu.Lock()
 		for i := startIdx; i < endIdx; i++ {
 			count += latencyHist.Counts[i]
 		}
 		latencyHist.mu.Unlock()
-		
+
 		if latencyHist.Total > 0 {
 			pct := float64(count) / float64(latencyHist.Total) * 100
 			label := fmt.Sprintf("%.1fms", b)

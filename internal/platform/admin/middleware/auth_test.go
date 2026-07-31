@@ -34,8 +34,8 @@ func TestAuthenticate(t *testing.T) {
 
 func TestRequireRole(t *testing.T) {
 	auth := &StaticTokenAuthenticator{
-		AdminToken:    "admin-secret",
-		ViewerToken:   "viewer-secret",
+		AdminToken:  "admin-secret",
+		ViewerToken: "viewer-secret",
 	}
 
 	// Route that requires Operator level
@@ -48,7 +48,7 @@ func TestRequireRole(t *testing.T) {
 		token      string
 		wantStatus int
 	}{
-		{"Admin Access", "Bearer admin-secret", http.StatusOK}, // Admin > Operator
+		{"Admin Access", "Bearer admin-secret", http.StatusOK},          // Admin > Operator
 		{"Viewer Denied", "Bearer viewer-secret", http.StatusForbidden}, // Viewer < Operator
 		{"Missing Auth", "", http.StatusUnauthorized},
 	}

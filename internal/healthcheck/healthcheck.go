@@ -97,9 +97,9 @@ type Check struct {
 
 // Result is the aggregated result of all health checks.
 type Result struct {
-	Status   string           `json:"status"` // "ok" or "degraded"
-	Checks   []Status         `json:"checks"`
-	Duration time.Duration    `json:"duration_ms"`
+	Status   string        `json:"status"` // "ok" or "degraded"
+	Checks   []Status      `json:"checks"`
+	Duration time.Duration `json:"duration_ms"`
 }
 
 // Registry holds a set of health checks and executes them.
@@ -241,7 +241,7 @@ func LiveHandler(hb *Heartbeat) http.HandlerFunc {
 
 		// If heartbeat is provided, check that main loops are alive.
 		// 10s threshold: allows for brief GC pauses but detects real deadlocks.
-		if hb != nil && !hb.IsAlive(10 * time.Second) {
+		if hb != nil && !hb.IsAlive(10*time.Second) {
 			w.WriteHeader(http.StatusServiceUnavailable)
 			_, _ = w.Write([]byte(`{"status":"not_ok","error":"heartbeat stale, possible deadlock"}`))
 			return

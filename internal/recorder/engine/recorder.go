@@ -29,10 +29,10 @@ func NewRecorder(store storage.EventStore, batchSize int, flushRate time.Duratio
 			batch[i].RecordingTime = now
 			recorder.EventsRecorded.WithLabelValues(batch[i].Symbol).Inc()
 		}
-		
+
 		recorder.BatchSize.Observe(float64(len(batch)))
 		err := r.store.WriteBatch(ctx, batch)
-		
+
 		// Return buffer to batcher for pooling
 		return batch, err
 	}

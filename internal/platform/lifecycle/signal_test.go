@@ -23,7 +23,7 @@ func TestSetupSignalHandler(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not find process: %v", err)
 	}
-	
+
 	err = p.Signal(syscall.SIGTERM)
 	if err != nil {
 		t.Fatalf("could not send signal: %v", err)

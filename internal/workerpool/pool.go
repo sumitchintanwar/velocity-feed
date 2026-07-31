@@ -67,12 +67,12 @@ type Pool struct {
 	stats     PoolStats
 	metrics   *Metrics
 
-	queue       chan any
-	wg          sync.WaitGroup
-	cancel      context.CancelFunc // cancels worker context on shutdown
-	stopped     atomic.Bool        // SS1: prevents Enqueue after Shutdown
-	closeOnce   sync.Once          // SS2: only close queue once
-	shutdownOnce sync.Once         // SS2: only run Shutdown logic once
+	queue        chan any
+	wg           sync.WaitGroup
+	cancel       context.CancelFunc // cancels worker context on shutdown
+	stopped      atomic.Bool        // SS1: prevents Enqueue after Shutdown
+	closeOnce    sync.Once          // SS2: only close queue once
+	shutdownOnce sync.Once          // SS2: only run Shutdown logic once
 }
 
 // New creates a Pool with the given config. Call Start to begin processing.
@@ -180,55 +180,72 @@ func (p *Pool) worker(ctx context.Context, id int) {
 	defer p.wg.Done()
 
 	for {
-		select {
-		case event, ok := <-p.queue:
-			if !ok {
-				// Channel closed — drain complete.
-				return
-			}
-			// Process with per-iteration panic recovery.
-			p.processEvent(ctx, id, event)
-		case <-ctx.Done():
-			// D1/GL1: context cancelled (Shutdown or parent cancel).
-			return
-		}
-	}
-}
+		panicked := true
+		func() {
+			var processing bool
+			var start time.Time
 
-// processEvent handles a single event with panic recovery.
-// QS1: Processed is incremented in a defer so it's counted even
-// when Publish panics, preventing QueueDepth counter drift.
-func (p *Pool) processEvent(ctx context.Context, id int, event any) {
-	p.stats.QueueDepth.Add(-1)
-	if p.metrics != nil {
-		p.metrics.QueueDepth.Dec()
-		p.metrics.ActiveWorkers.Inc()
-	}
-	start := time.Now()
-	func() {
-		defer func() {
-			if r := recover(); r != nil {
-				p.stats.Panics.Add(1)
-				if p.metrics != nil {
-					p.metrics.TasksFailed.Inc()
+			defer func() {
+				if r := recover(); r != nil {
+					p.stats.Panics.Add(1)
+					if p.metrics != nil {
+						p.metrics.TasksFailed.Inc()
+					}
+					p.log.Underlying().Error().
+						Int("worker", id).
+						Interface("panic", r).
+						Str("event", "worker_panic_recovered").
+						Msg("worker panic recovered")
+						
+					// If panic occurred during Publish, ensure we still clean up metrics
+					if processing {
+						p.stats.Processed.Add(1)
+						if p.metrics != nil {
+							p.metrics.TasksCompleted.Inc()
+							p.metrics.TaskDurationSeconds.Observe(time.Since(start).Seconds())
+							p.metrics.ActiveWorkers.Dec()
+						}
+					}
 				}
-				p.log.Underlying().Error().
-					Int("worker", id).
-					Interface("panic", r).
-					Str("event", "worker_panic_recovered").
-					Msg("worker panic recovered")
-			}
-			// QS1: always count as processed (recovered or not).
-			p.stats.Processed.Add(1)
-			if p.metrics != nil {
-				p.metrics.TasksCompleted.Inc()
-				p.metrics.TaskDurationSeconds.Observe(time.Since(start).Seconds())
-				p.metrics.ActiveWorkers.Dec()
+			}()
+
+			for {
+				select {
+				case event, ok := <-p.queue:
+					if !ok {
+						panicked = false
+						return
+					}
+
+					p.stats.QueueDepth.Add(-1)
+					if p.metrics != nil {
+						p.metrics.QueueDepth.Dec()
+						p.metrics.ActiveWorkers.Inc()
+					}
+					
+					start = time.Now()
+					processing = true
+
+					p.publisher.Publish(ctx, event)
+
+					processing = false
+					p.stats.Processed.Add(1)
+					if p.metrics != nil {
+						p.metrics.TasksCompleted.Inc()
+						p.metrics.TaskDurationSeconds.Observe(time.Since(start).Seconds())
+						p.metrics.ActiveWorkers.Dec()
+					}
+				case <-ctx.Done():
+					panicked = false
+					return
+				}
 			}
 		}()
 
-		p.publisher.Publish(ctx, event)
-	}()
+		if !panicked {
+			break
+		}
+	}
 }
 
 // Shutdown signals the queue to close and waits for all workers to
@@ -261,12 +278,12 @@ func (p *Pool) Shutdown(ctx context.Context) error {
 
 		select {
 		case <-done:
-		p.log.Underlying().Info().
-			Int64("processed", p.stats.Processed.Load()).
-			Int64("dropped", p.stats.Dropped.Load()).
-			Int64("panics", p.stats.Panics.Load()).
-			Str("event", "worker_pool_shut_down").
-			Msg("worker pool shut down")
+			p.log.Underlying().Info().
+				Int64("processed", p.stats.Processed.Load()).
+				Int64("dropped", p.stats.Dropped.Load()).
+				Int64("panics", p.stats.Panics.Load()).
+				Str("event", "worker_pool_shut_down").
+				Msg("worker pool shut down")
 		case <-shutdownCtx.Done():
 			// D1/GL1: workers stuck in blocking Publish — cancel
 			// context to force-exit them.

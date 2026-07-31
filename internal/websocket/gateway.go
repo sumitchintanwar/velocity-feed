@@ -25,12 +25,13 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/gorilla/websocket"
+	wscontext "github.com/sumit/rtmds/internal/correlation/websocket"
 	logpkg "github.com/sumit/rtmds/internal/log"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/snapshot"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/tracing"
-	wscontext "github.com/sumit/rtmds/internal/correlation/websocket"
+	"github.com/sumit/rtmds/pkg/protocol"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -97,8 +98,8 @@ type connRateLimiter struct {
 
 func newConnRateLimiter(maxConnsPerSec float64) *connRateLimiter {
 	return &connRateLimiter{
-		tokens:  maxConnsPerSec, // start full
-		maxRate: maxConnsPerSec,
+		tokens:   maxConnsPerSec, // start full
+		maxRate:  maxConnsPerSec,
 		lastTime: time.Now(),
 	}
 }
@@ -129,11 +130,16 @@ func (r *connRateLimiter) Allow() bool {
 // entry point for HTTP upgrades and the owner of all client goroutines.
 // Uses sharded client maps to reduce lock contention during connection storms.
 type Gateway struct {
-	tm      topicmanager.Manager
-	snap    *snapshot.Service // optional; nil disables snapshot delivery
-	log     *logpkg.Logger
-	metrics *platform.Metrics
-	id      string // unique gateway identifier for sticky session routing
+	tm         topicmanager.Manager
+	snap       *snapshot.Service // optional; nil disables snapshot delivery
+	replay     *ReplayHandler    // optional; nil disables replay
+	wal        Replayer          // new: WAL replayer for reconnects
+	log        *logpkg.Logger
+	metrics    *platform.Metrics
+	id         string               // unique gateway identifier for sticky session routing
+	redirector Redirector           // optional; if set, enforces partition ownership
+	negotiator *protocol.Negotiator // handles subprotocol negotiation
+	registry   *protocol.Registry   // serializer registry
 
 	shards    []clientShard
 	shardMask uint32
@@ -151,6 +157,9 @@ type Gateway struct {
 
 	// heartbeat tracks per-client pong timestamps and detects dead connections.
 	heartbeat *HeartbeatManager
+
+	// lifecycle manages the gateway state machine (Starting, Healthy, Draining, Offline).
+	lifecycle *Lifecycle
 }
 
 // NewGateway creates a ready-to-use Gateway.
@@ -166,19 +175,30 @@ func NewGateway(tm topicmanager.Manager, log *logpkg.Logger, metrics *platform.M
 // When snap is non-nil, newly subscribed clients receive current market
 // snapshots before live streaming begins.
 func NewGatewayWithSnapshot(tm topicmanager.Manager, snap *snapshot.Service, log *logpkg.Logger, metrics *platform.Metrics, maxConnsPerSec float64, gatewayID ...string) *Gateway {
+	return NewGatewayWithReplay(tm, snap, nil, nil, log, metrics, maxConnsPerSec, gatewayID...)
+}
+
+// NewGatewayWithReplay creates a Gateway with snapshot and replay support.
+// When replay is non-nil, clients can request historical replay via WebSocket.
+func NewGatewayWithReplay(tm topicmanager.Manager, snap *snapshot.Service, replay *ReplayHandler, wal Replayer, log *logpkg.Logger, metrics *platform.Metrics, maxConnsPerSec float64, gatewayID ...string) *Gateway {
 	n := uint32(clientShardCount)
 	id := "default"
 	if len(gatewayID) > 0 && gatewayID[0] != "" {
 		id = gatewayID[0]
 	}
 	g := &Gateway{
-		tm:        tm,
-		snap:      snap,
-		log:       log,
-		metrics:   metrics,
-		id:        id,
-		shards:    make([]clientShard, n),
-		shardMask: n - 1,
+		tm:         tm,
+		snap:       snap,
+		replay:     replay,
+		wal:        wal,
+		log:        log,
+		metrics:    metrics,
+		id:         id,
+		negotiator: protocol.NewNegotiator(),
+		registry:   protocol.NewRegistry(),
+		shards:     make([]clientShard, n),
+		shardMask:  n - 1,
+		lifecycle:  NewLifecycle(),
 	}
 	for i := range g.shards {
 		g.shards[i].clients = make(map[string]*Client)
@@ -187,11 +207,71 @@ func NewGatewayWithSnapshot(tm topicmanager.Manager, snap *snapshot.Service, log
 		g.connLimiter = newConnRateLimiter(maxConnsPerSec)
 	}
 
+	// Register default serializers
+	g.registry.Register(protocol.NewJSONSerializer())
+	g.registry.Register(protocol.NewProtobufSerializer())
+	g.registry.Register(protocol.NewFlatBuffersSerializer())
+
 	// Start the heartbeat manager for dead connection detection.
-	g.heartbeat = NewHeartbeatManager(log, metrics, DefaultPingInterval, DefaultPongTimeout)
+	g.heartbeat = NewHeartbeatManager(log, metrics, DefaultPingInterval, DefaultMissedHeartbeats)
 	go g.heartbeat.Run()
 
+	// Register metrics observer for lifecycle transitions
+	if metrics != nil {
+		metrics.GatewayState.Set(0) // 0=Starting
+		var lastStateTime time.Time
+		g.lifecycle.Observe(func(from, to LifecycleState) {
+			now := time.Now()
+			var duration time.Duration
+			if !lastStateTime.IsZero() {
+				duration = now.Sub(lastStateTime)
+			}
+			lastStateTime = now
+
+			var stateVal float64
+			switch to {
+			case LifecycleStarting:
+				stateVal = 0
+			case LifecycleHealthy:
+				stateVal = 1
+				// If transitioning to healthy from starting or draining, it's a recovery
+				if duration > 0 && (from == LifecycleStarting || from == LifecycleDraining) {
+					metrics.GatewayRecoveryTime.Observe(duration.Seconds())
+				}
+			case LifecycleDraining:
+				stateVal = 2
+			case LifecycleOffline:
+				stateVal = 3
+			}
+
+			// If transitioning out of Offline
+			if duration > 0 && from == LifecycleOffline {
+				metrics.GatewayDowntime.Observe(duration.Seconds())
+			}
+
+			metrics.GatewayState.Set(stateVal)
+			metrics.GatewayStateTransitionsTotal.WithLabelValues(string(from), string(to)).Inc()
+		})
+	}
+
+	_ = g.lifecycle.Transition(LifecycleHealthy)
+
 	return g
+}
+
+// State returns the current lifecycle state of the gateway.
+func (g *Gateway) State() LifecycleState {
+	return g.lifecycle.State()
+}
+
+// ObserveLifecycle registers a callback for gateway state transitions.
+func (g *Gateway) ObserveLifecycle(observer LifecycleObserver) {
+	g.lifecycle.Observe(observer)
+}
+
+// SetRedirector injects a topology redirector into the Gateway.
+func (g *Gateway) SetRedirector(r Redirector) {
+	g.redirector = r
 }
 
 // shard returns the client shard for the given ID.
@@ -232,6 +312,16 @@ func (g *Gateway) Handler() http.HandlerFunc {
 		)
 		defer span.End()
 
+		state := g.lifecycle.State()
+		if state == LifecycleDraining || state == LifecycleOffline {
+			span.SetAttributes(attribute.Bool("error", true))
+			span.AddEvent("connection_rejected", trace.WithAttributes(
+				attribute.String("reason", string(state)),
+			))
+			http.Error(w, "gateway is "+string(state), http.StatusServiceUnavailable)
+			return
+		}
+
 		// RC2: Reject if at capacity.
 		if g.ClientCount() >= maxConnections {
 			span.SetAttributes(attribute.Bool("error", true))
@@ -260,7 +350,34 @@ func (g *Gateway) Handler() http.HandlerFunc {
 		// before the upgrade so it's available in the HTTP response.
 		w.Header().Set("rtmds-gateway-id", g.id)
 
-		conn, err := upgrader.Upgrade(w, r, nil)
+		// Protocol Negotiation
+		clientProtocols := websocket.Subprotocols(r)
+		format, matchedStr, err := g.negotiator.SelectProtocol(clientProtocols)
+		if err != nil {
+			g.metrics.WSAuthFailures.Inc()
+			span.SetAttributes(attribute.Bool("error", true))
+			span.AddEvent("connection_rejected", trace.WithAttributes(
+				attribute.String("reason", "unsupported_protocol"),
+			))
+			http.Error(w, "unsupported subprotocol", http.StatusBadRequest)
+			return
+		}
+
+		responseHeader := http.Header{}
+		if matchedStr != "" {
+			responseHeader.Set("Sec-WebSocket-Protocol", matchedStr)
+		}
+
+		serializer, err := g.registry.Lookup(format)
+		if err != nil {
+			// Fallback to JSON if something is misconfigured
+			serializer, _ = g.registry.Lookup(protocol.FormatJSON)
+			if serializer == nil {
+				serializer = protocol.NewJSONSerializer()
+			}
+		}
+
+		conn, err := upgrader.Upgrade(w, r, responseHeader)
 		if err != nil {
 			logpkg.Error(r.Context(), g.log).Err(err).Str("event", "websocket_upgrade_failed").Msg("websocket upgrade failed")
 			g.metrics.WSAuthFailures.Inc()
@@ -281,27 +398,21 @@ func (g *Gateway) Handler() http.HandlerFunc {
 		// cancellation tree while preserving W3C Baggage and Trace Context.
 		ctx, cancel := wscontext.NewConnectionContext(r.Context())
 
-		c := newClient(id, conn, g.tm, g.snap, g.log.WithField("client_id", id), cancel, g.metrics, g.heartbeat)
+		c := newClient(id, conn, g.tm, g.snap, g.log.WithField("client_id", id), cancel, g.metrics, g.heartbeat, g.replay, g.wal, g.redirector, format, serializer)
 
 		g.register(c)
-		// Register with heartbeat manager for dead connection detection.
-		g.heartbeat.Register(c.id, func() {
-			// Timeout callback: force-close the connection.
-			// readPump will exit and trigger unregister.
-			_ = c.conn.Close()
-		})
-		g.metrics.WSConnectionsActive.Inc()
 		logpkg.Info(ctx, c.log).Str("remote", r.RemoteAddr).Str("event", "client_connected").Msg("client connected")
 
 		span.AddEvent("client_registered", trace.WithAttributes(
 			attribute.String("client.id", id),
 		))
 
+		connectTime := time.Now()
+
 		// Use defer for cleanup so it runs reliably, even if readPump panics.
 		defer func() {
-			g.heartbeat.Unregister(id)
 			g.unregister(id)
-			g.metrics.WSConnectionsActive.Dec()
+			g.metrics.ConnectionDurationSeconds.Observe(time.Since(connectTime).Seconds())
 			logpkg.Info(ctx, c.log).Str("event", "client_disconnected").Msg("client disconnected")
 		}()
 
@@ -323,7 +434,7 @@ func (g *Gateway) register(c *Client) {
 
 	// Track connection lifecycle for Prometheus.
 	g.metrics.WSConnectionsOpened.Inc()
-	g.metrics.WSConnectionsActive.Inc()
+	g.metrics.ActiveConnections.Inc()
 
 	// Atomic peak tracking.
 	for {
@@ -349,7 +460,7 @@ func (g *Gateway) unregister(id string) {
 		c.cancelAll()
 		g.activeCount.Add(-1)
 		g.metrics.WSConnectionsClosed.Inc()
-		g.metrics.WSConnectionsActive.Dec()
+		g.metrics.ActiveConnections.Dec()
 	}
 }
 
@@ -388,10 +499,6 @@ func (g *Gateway) Broadcast(msg ServerMessage) {
 // specified close code and reason. Unlike Shutdown, this does not wait for
 // graceful drain — it's used when a critical dependency (Redis) fails and
 // clients must reconnect to a healthy gateway immediately.
-//
-// Without this, clients remain connected but receive no market data
-// (zombie connections). The client's socket appears open but the market
-// appears frozen from their perspective.
 func (g *Gateway) EvictAll(code int, reason string) {
 	// Collect all clients from all shards.
 	var snapshot []*Client
@@ -415,19 +522,24 @@ func (g *Gateway) EvictAll(code int, reason string) {
 		Str("event", "gateway_evicting_clients").
 		Msg("gateway: evicting all clients due to dependency failure")
 
-	// Send close frame to each client and cancel their context.
-	deadline := time.Now().Add(writeWait)
+	// Send close frame to each client concurrently to avoid sequential blocking.
 	for _, c := range snapshot {
-		// Send close frame with specific code.
-		_ = c.conn.WriteControl(
-			websocket.CloseMessage,
-			websocket.FormatCloseMessage(code, reason),
-			deadline,
-		)
-		// Cancel context to force readPump/writePump to exit.
-		c.cancelCtx()
-		// Force ReadMessage to return immediately.
-		_ = c.conn.SetReadDeadline(time.Now().Add(-time.Second))
+		go func(client *Client) {
+			deadline := time.Now().Add(writeWait)
+			// Send close frame with specific code, protected by writeMu to avoid
+			// concurrent writes with writePump.
+			client.writeMu.Lock()
+			_ = client.conn.WriteControl(
+				websocket.CloseMessage,
+				websocket.FormatCloseMessage(code, reason),
+				deadline,
+			)
+			client.writeMu.Unlock()
+			// Cancel context to force readPump/writePump to exit.
+			client.cancelCtx()
+			// Force ReadMessage to return immediately.
+			_ = client.conn.SetReadDeadline(time.Now().Add(-time.Second))
+		}(c)
 	}
 }
 
@@ -438,6 +550,8 @@ func (g *Gateway) EvictAll(code int, reason string) {
 // GL4: Adds randomized delay before draining to stagger shutdown across
 // multiple gateway instances, preventing thundering herd on load balancers.
 func (g *Gateway) Shutdown(ctx context.Context) {
+	_ = g.lifecycle.Transition(LifecycleDraining)
+
 	// GL4: Randomized delay (50-200ms) to stagger drain across gateways.
 	// When multiple gateways restart simultaneously, this prevents all of
 	// them from closing connections at the exact same moment, which would
@@ -447,6 +561,7 @@ func (g *Gateway) Shutdown(ctx context.Context) {
 	select {
 	case <-time.After(delay):
 	case <-ctx.Done():
+		_ = g.lifecycle.Transition(LifecycleOffline)
 		return
 	}
 
@@ -473,10 +588,12 @@ func (g *Gateway) Shutdown(ctx context.Context) {
 		select {
 		case <-sem:
 		case <-ctx.Done():
+			_ = g.lifecycle.Transition(LifecycleOffline)
 			return
 		}
 	}
 
 	// Stop the heartbeat manager after all clients are disconnected.
 	g.heartbeat.Stop()
+	_ = g.lifecycle.Transition(LifecycleOffline)
 }

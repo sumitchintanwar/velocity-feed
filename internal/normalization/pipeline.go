@@ -7,7 +7,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Pipeline represents a full normalization stage for a specific exchange adapter.

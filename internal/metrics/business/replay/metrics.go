@@ -10,8 +10,8 @@ import (
 
 // Metrics encapsulates throughput metrics for historical Replays.
 type Metrics struct {
-	RequestsTotal           interfaces.Counter
-	MessagesDeliveredTotal  interfaces.Counter
+	RequestsTotal          interfaces.Counter
+	MessagesDeliveredTotal interfaces.Counter
 }
 
 // NewMetrics instantiates and registers the Replay metric group.

@@ -13,11 +13,11 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/feed"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
 	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // latencyRecorder captures generation-to-delivery latency in a histogram.
@@ -62,14 +62,14 @@ func (r *latencyRecorder) Summary() string {
 // Buckets: 0-100us, 100us-500us, 500us-1ms, 1-2ms, 2-5ms, 5-10ms, 10-50ms, 50ms+
 func (r *latencyRecorder) BucketCounts() map[string]int {
 	buckets := map[string]int{
-		"0-100us":   0,
+		"0-100us":     0,
 		"100us-500us": 0,
-		"500us-1ms": 0,
-		"1-2ms":     0,
-		"2-5ms":     0,
-		"5-10ms":    0,
-		"10-50ms":   0,
-		"50ms+":     0,
+		"500us-1ms":   0,
+		"1-2ms":       0,
+		"2-5ms":       0,
+		"5-10ms":      0,
+		"10-50ms":     0,
+		"50ms+":       0,
 	}
 	for _, d := range r.histogram {
 		us := d.Microseconds()
@@ -132,10 +132,10 @@ type timedFeed struct {
 	symbols []string
 }
 
-func (f *timedFeed) Name() string                                       { return "timed-feed" }
-func (f *timedFeed) Subscribe(symbols ...string) error                  { return nil }
-func (f *timedFeed) Unsubscribe(symbols ...string) error                { return nil }
-func (f *timedFeed) Bars() (<-chan marketdata.Bar, error)               { return nil, nil }
+func (f *timedFeed) Name() string                         { return "timed-feed" }
+func (f *timedFeed) Subscribe(symbols ...string) error    { return nil }
+func (f *timedFeed) Unsubscribe(symbols ...string) error  { return nil }
+func (f *timedFeed) Bars() (<-chan marketdata.Bar, error) { return nil, nil }
 
 func (f *timedFeed) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 	out := make(chan marketdata.Quote, 1024)

@@ -8,13 +8,13 @@ import (
 
 	"github.com/sumit/rtmds/internal/tracing/attributes"
 	"github.com/sumit/rtmds/internal/tracing/config"
+	"github.com/sumit/rtmds/internal/tracing/samplers"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
-	"github.com/sumit/rtmds/internal/tracing/samplers"
 )
 
 // Provider holds the configured TracerProvider and ensures graceful shutdown.

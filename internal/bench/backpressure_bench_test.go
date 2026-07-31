@@ -9,11 +9,11 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/feed"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/pubsub"
 	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/topicmanager"
 	"github.com/sumit/rtmds/internal/websocket"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // ---------- Slow Consumer ----------

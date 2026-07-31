@@ -38,8 +38,8 @@ type LogEntry struct {
 	Component     string `json:"component"`
 	Event         string `json:"event"`
 	CorrelationID string `json:"correlation_id,omitempty"`
-	TraceID       string `json:"trace_id,omitempty"`       // W3C trace ID for distributed tracing
-	SpanID        string `json:"span_id,omitempty"`        // W3C span ID for distributed tracing
+	TraceID       string `json:"trace_id,omitempty"` // W3C trace ID for distributed tracing
+	SpanID        string `json:"span_id,omitempty"`  // W3C span ID for distributed tracing
 	InstanceID    string `json:"instance_id"`
 	Message       string `json:"message"`
 }

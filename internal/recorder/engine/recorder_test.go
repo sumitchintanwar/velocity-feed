@@ -55,7 +55,7 @@ func TestRecorderBatching(t *testing.T) {
 	if len(events) != 10 {
 		t.Fatalf("Expected 10 events stored, got %d", len(events))
 	}
-	
+
 	// Verify RecordingTime was injected
 	if events[0].RecordingTime.IsZero() {
 		t.Errorf("RecordingTime was not set by the recorder engine")
@@ -110,5 +110,3 @@ func TestRecordingValidation(t *testing.T) {
 		t.Fatalf("Expected %d events stored, got %d", totalEvents, len(events))
 	}
 }
-
-

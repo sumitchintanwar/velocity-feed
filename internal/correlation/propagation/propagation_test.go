@@ -53,7 +53,7 @@ func TestWorkerPropagation(t *testing.T) {
 func BenchmarkRedisInject(b *testing.B) {
 	ctx := context.Background()
 	ctx = corrcontext.WithCorrelationID(ctx, "benchmark-correlation-id")
-	
+
 	carrier := NewFastCarrier()
 
 	b.ResetTimer()
@@ -66,10 +66,10 @@ func BenchmarkRedisInject(b *testing.B) {
 func BenchmarkRedisExtract(b *testing.B) {
 	ctx := context.Background()
 	ctx = corrcontext.WithCorrelationID(ctx, "benchmark-correlation-id")
-	
+
 	carrier := NewFastCarrier()
 	Inject(ctx, carrier)
-	
+
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_ = Extract(context.Background(), carrier)

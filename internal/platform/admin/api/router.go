@@ -61,14 +61,14 @@ func NewRouter(cfg RouterConfig) *http.ServeMux {
 	cfg.CommandBus.Register("configuration/profiling", func(payload map[string]interface{}) (commands.Command, error) {
 		mutexFraction := -1
 		blockRate := -1
-		
+
 		if v, ok := payload["mutex_fraction"].(float64); ok {
 			mutexFraction = int(v)
 		}
 		if v, ok := payload["block_rate"].(float64); ok {
 			blockRate = int(v)
 		}
-		
+
 		return &commands.SetProfilingRatesCommand{
 			MutexFraction: mutexFraction,
 			BlockRate:     blockRate,
@@ -100,7 +100,7 @@ func NewRouter(cfg RouterConfig) *http.ServeMux {
 	mux.Handle("/diagnostics/debug/pprof/profile", authn(requireAdmin(http.HandlerFunc(pprof.Profile))))
 	mux.Handle("/diagnostics/debug/pprof/symbol", authn(requireAdmin(http.HandlerFunc(pprof.Symbol))))
 	mux.Handle("/diagnostics/debug/pprof/trace", authn(requireAdmin(http.HandlerFunc(pprof.Trace))))
-	
+
 	// Explicitly register sub-profiles to bypass pprof.Index path prefix bug
 	mux.Handle("/diagnostics/debug/pprof/heap", authn(requireAdmin(pprof.Handler("heap"))))
 	mux.Handle("/diagnostics/debug/pprof/allocs", authn(requireAdmin(pprof.Handler("allocs"))))

@@ -3,11 +3,11 @@ package config
 
 // Config encapsulates settings for the OpenTelemetry TracerProvider.
 type Config struct {
-	ServiceName     string  // e.g. "marketdata-gateway"
-	Environment     string  // e.g. "production", "staging"
-	OTLPEndpoint    string  // e.g. "localhost:4318"
-	Insecure        bool    // Set to true for local testing without TLS
-	SamplingRate    float64 // 0.0 to 1.0
+	ServiceName  string  // e.g. "marketdata-gateway"
+	Environment  string  // e.g. "production", "staging"
+	OTLPEndpoint string  // e.g. "localhost:4318"
+	Insecure     bool    // Set to true for local testing without TLS
+	SamplingRate float64 // 0.0 to 1.0
 }
 
 // DefaultConfig returns a secure default configuration for production.

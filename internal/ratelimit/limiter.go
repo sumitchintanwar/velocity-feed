@@ -25,12 +25,12 @@ type limiterShard struct {
 //
 // Thread-safe for concurrent use.
 type Limiter struct {
-	cfg      Config
-	shards   []limiterShard
+	cfg       Config
+	shards    []limiterShard
 	shardMask uint32
-	metrics  *PrometheusMetrics
-	stopCh   chan struct{}
-	wg       sync.WaitGroup
+	metrics   *PrometheusMetrics
+	stopCh    chan struct{}
+	wg        sync.WaitGroup
 }
 
 // NewLimiter creates a per-client rate limiter with the given config.
@@ -39,11 +39,11 @@ type Limiter struct {
 func NewLimiter(cfg Config, metrics *PrometheusMetrics) *Limiter {
 	n := uint32(defaultShards)
 	l := &Limiter{
-		cfg:      cfg,
-		shards:   make([]limiterShard, n),
+		cfg:       cfg,
+		shards:    make([]limiterShard, n),
 		shardMask: n - 1,
-		metrics:  metrics,
-		stopCh:   make(chan struct{}),
+		metrics:   metrics,
+		stopCh:    make(chan struct{}),
 	}
 	for i := range l.shards {
 		l.shards[i].clients = make(map[string]*clientLimits)
@@ -310,10 +310,10 @@ func (l *Limiter) evictStale() {
 // PrometheusMetrics holds Prometheus instruments for the rate limiter.
 // Uses aggregate counters (no per-client labels) to avoid cardinality explosion.
 type PrometheusMetrics struct {
-	ConnectAllowed    prometheus.Counter
-	ConnectRejected   prometheus.Counter
-	SubscribeAllowed  prometheus.Counter
-	SubscribeRejected prometheus.Counter
+	ConnectAllowed      prometheus.Counter
+	ConnectRejected     prometheus.Counter
+	SubscribeAllowed    prometheus.Counter
+	SubscribeRejected   prometheus.Counter
 	UnsubscribeAllowed  prometheus.Counter
 	UnsubscribeRejected prometheus.Counter
 	LimiterHits         *prometheus.CounterVec

@@ -156,11 +156,17 @@ func (p *Pool) reportProgress(ctx context.Context) {
 
 // disconnect gracefully shuts down all clients.
 func (p *Pool) disconnect() {
+	var wg sync.WaitGroup
 	for _, c := range p.clients {
 		if c != nil {
-			c.close()
+			wg.Add(1)
+			go func(client *client) {
+				defer wg.Done()
+				client.close()
+			}(c)
 		}
 	}
+	wg.Wait()
 }
 
 // FormatResult returns a human-readable summary of the load test results.

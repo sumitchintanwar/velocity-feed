@@ -101,7 +101,7 @@ func (r *Runner) Run(ctx context.Context, exp Experiment, validators []Validator
 
 func (r *Runner) pollValidators(ctx context.Context, validators []Validator, timeout time.Duration) []ValidationResult {
 	deadline := time.Now().Add(timeout)
-	
+
 	// Create a slice to track which validations have succeeded
 	passed := make([]bool, len(validators))
 	results := make([]ValidationResult, len(validators))

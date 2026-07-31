@@ -2,7 +2,7 @@
 //
 // Purpose:
 // Decouples application logic from the concrete Prometheus library implementation.
-// This allows services to use metrics without importing Prometheus, making it 
+// This allows services to use metrics without importing Prometheus, making it
 // easier to mock metrics in unit tests and preventing tight coupling.
 //
 // Architecture & Design Decisions:

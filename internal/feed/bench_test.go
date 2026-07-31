@@ -9,10 +9,10 @@ import (
 
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
 	"github.com/sumit/rtmds/internal/sequencer"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // benchFeed is a mock feed that generates quotes as fast as possible.
@@ -20,10 +20,10 @@ type benchFeed struct {
 	symbols []string
 }
 
-func (f *benchFeed) Name() string                                       { return "bench-feed" }
-func (f *benchFeed) Subscribe(symbols ...string) error                  { return nil }
-func (f *benchFeed) Unsubscribe(symbols ...string) error                { return nil }
-func (f *benchFeed) Bars() (<-chan marketdata.Bar, error)               { return nil, nil }
+func (f *benchFeed) Name() string                         { return "bench-feed" }
+func (f *benchFeed) Subscribe(symbols ...string) error    { return nil }
+func (f *benchFeed) Unsubscribe(symbols ...string) error  { return nil }
+func (f *benchFeed) Bars() (<-chan marketdata.Bar, error) { return nil, nil }
 
 func (f *benchFeed) Run(ctx context.Context) (<-chan marketdata.Quote, error) {
 	out := make(chan marketdata.Quote, 1024)

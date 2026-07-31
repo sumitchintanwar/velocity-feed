@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 func benchQuote(symbol string) marketdata.Quote {

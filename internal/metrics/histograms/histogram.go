@@ -45,7 +45,7 @@ func (h *histogramWrapper) ObserveWithContext(ctx context.Context, val float64) 
 		h.metric.Observe(val)
 		return
 	}
-	
+
 	m, err := h.vec.GetMetricWithLabelValues()
 	if err == nil {
 		if eo, ok := m.(prometheus.ExemplarObserver); ok && exemplar != nil {

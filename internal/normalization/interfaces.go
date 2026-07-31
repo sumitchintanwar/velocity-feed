@@ -1,7 +1,7 @@
 package normalization
 
 import (
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // Mapper is responsible for transforming an exchange-specific raw payload

@@ -30,7 +30,7 @@ func (m *Manager) InitBook(snapshot *OrderBook) {
 	mb, _ := m.books.LoadOrStore(snapshot.Symbol, &managedBook{
 		book: &OrderBook{Symbol: snapshot.Symbol},
 	})
-	
+
 	wrapper := mb.(*managedBook)
 	wrapper.mu.Lock()
 	defer wrapper.mu.Unlock()
@@ -38,7 +38,7 @@ func (m *Manager) InitBook(snapshot *OrderBook) {
 	// Deep copy to prevent external mutation
 	newBids := make([]PriceLevel, len(snapshot.Bids))
 	copy(newBids, snapshot.Bids)
-	
+
 	newAsks := make([]PriceLevel, len(snapshot.Asks))
 	copy(newAsks, snapshot.Asks)
 
@@ -58,14 +58,14 @@ func (m *Manager) ApplyIncrement(inc OrderBookIncrement) error {
 	}
 
 	wrapper := v.(*managedBook)
-	
+
 	// Anonymous function to limit scope of lock
 	err := func() error {
 		wrapper.mu.Lock()
 		defer wrapper.mu.Unlock()
 		return wrapper.book.Apply(inc)
 	}()
-	
+
 	if err != nil {
 		return err
 	}

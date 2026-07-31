@@ -19,6 +19,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -28,23 +29,30 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/config"
-	"github.com/sumit/rtmds/internal/distribution/redisbus"
 	"github.com/sumit/rtmds/internal/discovery"
+	"github.com/sumit/rtmds/internal/distribution/redisbus"
 	"github.com/sumit/rtmds/internal/eventlog"
+	"github.com/sumit/rtmds/internal/exchange"
 	"github.com/sumit/rtmds/internal/feed"
 	"github.com/sumit/rtmds/internal/healthcheck"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
+
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/pubsub"
+	"github.com/sumit/rtmds/internal/recovery"
+	"github.com/sumit/rtmds/internal/replay"
+	"github.com/sumit/rtmds/internal/replay/engine"
+	"github.com/sumit/rtmds/internal/routing"
 	"github.com/sumit/rtmds/internal/sequencer"
 	"github.com/sumit/rtmds/internal/snapshot"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/internal/topology"
 	"github.com/sumit/rtmds/internal/tracing"
 	"github.com/sumit/rtmds/internal/transport"
+	"github.com/sumit/rtmds/internal/wal"
 	"github.com/sumit/rtmds/internal/websocket"
 	"golang.org/x/sync/errgroup"
-	"github.com/sumit/rtmds/internal/exchange"
 )
 
 // Build-time variables set via -ldflags.
@@ -55,15 +63,23 @@ var (
 
 // component records a registered component's metadata and lifecycle hooks.
 type component struct {
-	name    string
-	start   func(ctx context.Context) error
-	stop    func(ctx context.Context) error
-	health  func(ctx context.Context) platform.HealthStatus
-	order   int // startup order (lower = earlier)
+	name   string
+	start  func(ctx context.Context) error
+	stop   func(ctx context.Context) error
+	health func(ctx context.Context) platform.HealthStatus
+	order  int // startup order (lower = earlier)
 }
+
+// App modes
+const (
+	ModeMonolith  = "monolith"
+	ModePublisher = "publisher"
+	ModeGateway   = "gateway"
+)
 
 // App holds every wired component and exposes Run.
 type App struct {
+	mode     string
 	cfg      *config.Config
 	log      *log.Logger // structured logger with context propagation
 	server   *http.Server
@@ -75,11 +91,15 @@ type App struct {
 	gatherer prometheus.Gatherer
 	tracer   *tracing.Tracer // OpenTelemetry tracer (nil when tracing disabled)
 
+	// Routing components
+	routingEngine *routing.Engine
+	partitionMgr  *routing.PartitionManager
+
 	// Redis distribution components (nil when Redis is disabled).
-	redisClient   *redisbus.Publisher  // nil when not using Redis
-	redisSub      *redisbus.Subscriber // nil when not using Redis
-	registry      *discovery.Registry  // nil when discovery is disabled
-	eventLog      eventlog.Repository  // nil when database is disabled
+	redisClient *redisbus.Publisher  // nil when not using Redis
+	redisSub    *redisbus.Subscriber // nil when not using Redis
+	registry    *discovery.Registry  // nil when discovery is disabled
+	eventLog    eventlog.Repository  // nil when database is disabled
 
 	// Health check registry for dependency checks (Redis, Postgres, etc.)
 	healthRegistry *healthcheck.Registry
@@ -120,9 +140,23 @@ func (ln tcpKeepAliveListener) Accept() (net.Conn, error) {
 	return tc, nil
 }
 
-// New creates a new App and wires all components. It does NOT start them.
+// New creates a new App in monolith mode and wires all components. It does NOT start them.
 // Call App.Run() to begin the startup sequence.
 func New(cfg *config.Config) (*App, error) {
+	return newApp(cfg, ModeMonolith)
+}
+
+// NewPublisherApp creates an application wired specifically for publishing market data.
+func NewPublisherApp(cfg *config.Config) (*App, error) {
+	return newApp(cfg, ModePublisher)
+}
+
+// NewGatewayApp creates an application wired specifically for gateway and WebSocket fan-out.
+func NewGatewayApp(cfg *config.Config) (*App, error) {
+	return newApp(cfg, ModeGateway)
+}
+
+func newApp(cfg *config.Config, mode string) (*App, error) {
 	rlog := log.NewFromConfig(log.Config{
 		Level:       cfg.Log.Level,
 		Format:      cfg.Log.Format,
@@ -131,8 +165,9 @@ func New(cfg *config.Config) (*App, error) {
 	})
 
 	a := &App{
-		cfg: cfg,
-		log: rlog,
+		mode: mode,
+		cfg:  cfg,
+		log:  rlog,
 	}
 
 	if err := a.wire(); err != nil {
@@ -146,6 +181,47 @@ func New(cfg *config.Config) (*App, error) {
 // Deprecated: Use New() for new code.
 func Build(cfg *config.Config) (*App, error) {
 	return New(cfg)
+}
+
+// discoveryRegistryAdapter wraps a discovery.Registry to satisfy topology.Registry.
+type discoveryRegistryAdapter struct {
+	r *discovery.Registry
+}
+
+func (a *discoveryRegistryAdapter) List(ctx context.Context) ([]topology.GatewayMetadata, error) {
+	if a.r == nil {
+		return nil, nil // No discovery configured
+	}
+	infos, err := a.r.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	var res []topology.GatewayMetadata
+	for _, info := range infos {
+		state := topology.StateOnline
+		if info.Status != "healthy" {
+			state = topology.StateOffline
+		}
+		res = append(res, topology.GatewayMetadata{
+			ID:        info.ID,
+			Address:   fmt.Sprintf("%s:%d", info.Addr, info.Port),
+			State:     state,
+			UpdatedAt: info.LastHeartbeat,
+		})
+	}
+	return res, nil
+}
+
+func (a *discoveryRegistryAdapter) Register(ctx context.Context, meta topology.GatewayMetadata) error {
+	return nil
+}
+func (a *discoveryRegistryAdapter) Remove(ctx context.Context, id string) error    { return nil }
+func (a *discoveryRegistryAdapter) Heartbeat(ctx context.Context, id string) error { return nil }
+func (a *discoveryRegistryAdapter) UpdateState(ctx context.Context, id string, state topology.GatewayState) error {
+	return nil
+}
+func (a *discoveryRegistryAdapter) Get(ctx context.Context, id string) (topology.GatewayMetadata, error) {
+	return topology.GatewayMetadata{}, nil
 }
 
 // wire constructs all components in dependency order and registers them
@@ -241,37 +317,39 @@ func (a *App) wire() error {
 	// Use backpressure-aware queues with DropOldest policy and MaxAge
 	// to prevent stale data accumulation. This fixes the catastrophic
 	// latency observed in load tests where messages queue for minutes.
-	queueCfg := clientqueue.DefaultConfig()
-	queueCfg.QueueSize = 64
-	queueCfg.MaxAge = 100 * time.Millisecond
-	tm := topicmanager.NewWithQueue(0, &queueCfg, a.log, reg, metrics)
-	a.tm = tm
-	a.registerComponent(component{
-		name:  "topic-manager",
-		order: 20,
-		stop: func(ctx context.Context) error {
-			a.log.Underlying().Info().
-				Int("topics", tm.TopicCount()).
-				Str("event", "topic_manager_stopped").
-				Msg("topic-manager: stopped")
-			return nil
-		},
-		health: func(ctx context.Context) platform.HealthStatus {
-			topics := tm.TopicCount()
-			if topics == 0 {
-				return platform.Degraded("no active topics")
-			}
-			return platform.OK()
-		},
-	})
+	if a.mode == ModeMonolith || a.mode == ModeGateway {
+		queueCfg := clientqueue.DefaultConfig()
+		queueCfg.QueueSize = 64
+		queueCfg.MaxAge = 100 * time.Millisecond
+		tm := topicmanager.NewWithQueue(0, &queueCfg, a.log, reg, metrics)
+		a.tm = tm
+		a.registerComponent(component{
+			name:  "topic-manager",
+			order: 20,
+			stop: func(ctx context.Context) error {
+				a.log.Underlying().Info().
+					Int("topics", tm.TopicCount()).
+					Str("event", "topic_manager_stopped").
+					Msg("topic-manager: stopped")
+				return nil
+			},
+			health: func(ctx context.Context) platform.HealthStatus {
+				topics := tm.TopicCount()
+				if topics == 0 {
+					return platform.Degraded("no active topics")
+				}
+				return platform.OK()
+			},
+		})
+	}
 
 	// ── 2b. Distributed Router (when Redis is enabled) ──────────
 	// Wraps the local TopicManager with dynamic Redis subscription
 	// management. Gateway independence: only subscribes to Redis
 	// channels for symbols that local clients actually need.
 	var router *topicmanager.DistributedRouter
-	if a.cfg.Redis.Enabled {
-		router = topicmanager.NewDistributedRouter(tm, "market:", a.log, a.cfg.Server.GetGatewayID(),
+	if (a.mode == ModeMonolith || a.mode == ModeGateway) && a.cfg.Redis.Enabled {
+		router = topicmanager.NewDistributedRouter(a.tm, "market:", a.log, a.cfg.Server.GetGatewayID(),
 			topicmanager.WithSubscriptionChangeCallback(func(symbol string, change topicmanager.SubscriptionChange) {
 				if a.redisSub == nil {
 					return
@@ -295,23 +373,66 @@ func (a *App) wire() error {
 		a.log.Underlying().Info().Str("event", "distributed_router_initialized").Msg("distributed router: initialized")
 	}
 
-	// ── 2c. Snapshot Service ──────────────────────────────────
+	// ── 2c. WAL and Sequencer (Phase 1) ───────────────────────────
+	walDir := "data/wal" // In production, load from cfg
+	var walLog wal.Log
+	var walReplayer *replay.Service
+
+	// Create the data directory if it doesn't exist
+	_ = os.MkdirAll(walDir, 0755)
+
+	cfg := wal.DefaultConfig
+	cfg.Dir = walDir
+
+	var err error
+	walLog, err = wal.NewSegmentManager(cfg)
+	if err == nil {
+		alloc := sequencer.NewAllocator()
+
+		lastSeq := walLog.LastSequence()
+		alloc.Set(lastSeq)
+		a.log.Underlying().Info().Uint64("last_seq", lastSeq).Msg("wal: recovered last sequence")
+
+		replayEngine := replay.NewEngine(walLog)
+		walReplayer = replay.NewService(replayEngine, alloc)
+
+		a.registerComponent(component{
+			name:  "wal",
+			order: 12, // start before snapshot (25)
+			start: func(ctx context.Context) error {
+				return nil
+			},
+			stop: func(ctx context.Context) error {
+				_ = walLog.Close()
+				return nil
+			},
+			health: func(ctx context.Context) platform.HealthStatus {
+				return platform.OK()
+			},
+		})
+	} else {
+		a.log.Underlying().Error().Err(err).Msg("failed to initialize wal")
+	}
+
+	// ── 2d. Snapshot Service ──────────────────────────────────
 	// Maintains in-memory latest market state per symbol.
 	// New subscribers receive current snapshots before live streaming.
 	// TTL-based eviction removes inactive symbols to prevent memory leaks.
 	// Checkpoint persistence enables fast restart recovery.
-	snapLogger := log.SnapshotService(a.log)
-	snapOpts := []snapshot.Option{
-		snapshot.WithMaxAge(24 * time.Hour), // evict symbols inactive for 24h
-		snapshot.WithLogger(snapLogger),
-	}
-	if a.cfg.Snapshot.Enabled {
-		snapOpts = append(snapOpts, snapshot.WithCheckpoint(
-			a.cfg.Snapshot.CheckpointPath,
-			a.cfg.Snapshot.CheckpointInterval,
-		))
-	}
-	snap := snapshot.New(snapOpts...)
+	var snap *snapshot.Service
+	if a.mode == ModeMonolith || a.mode == ModeGateway {
+		snapLogger := log.SnapshotService(a.log)
+		snapOpts := []snapshot.Option{
+			snapshot.WithMaxAge(24 * time.Hour), // evict symbols inactive for 24h
+			snapshot.WithLogger(snapLogger),
+		}
+		if a.cfg.Snapshot.Enabled {
+			snapOpts = append(snapOpts, snapshot.WithCheckpoint(
+				a.cfg.Snapshot.CheckpointPath,
+				a.cfg.Snapshot.CheckpointInterval,
+			))
+		}
+		snap = snapshot.New(snapOpts...)
 	a.registerComponent(component{
 		name:  "snapshot-service",
 		order: 25,
@@ -319,12 +440,19 @@ func (a *App) wire() error {
 			snap.Start(ctx)
 
 			// Recovery: load checkpoint + replay missing events.
-			var repo eventlog.Repository
-			if a.eventLog != nil {
-				repo = a.eventLog
-			}
-			if err := snap.Recover(ctx, repo); err != nil {
-				snapLogger.Underlying().Warn().Err(err).Str("event", "recovery_failed").Msg("snapshot-service: recovery failed, starting fresh")
+			if walLog != nil {
+				recoverer := recovery.NewWALRecoverer(snap, walLog)
+				if _, err := recoverer.Recover(ctx); err != nil {
+					snapLogger.Underlying().Warn().Err(err).Str("event", "wal_recovery_failed").Msg("snapshot-service: WAL recovery failed, starting fresh")
+				}
+			} else {
+				var repo eventlog.Repository
+				if a.eventLog != nil {
+					repo = a.eventLog
+				}
+				if rErr := snap.Recover(ctx, repo); rErr != nil {
+					snapLogger.Underlying().Warn().Err(rErr).Str("event", "recovery_failed").Msg("snapshot-service: postgres recovery failed, starting fresh")
+				}
 			}
 
 			snap.MarkReady()
@@ -349,37 +477,54 @@ func (a *App) wire() error {
 			return platform.OK()
 		},
 	})
+	}
+
+	// ── 2e. Replay Handler ────────────────────────────────────────
+	// When the event log is enabled, create a replay handler that allows
+	// WebSocket clients to request historical event replay.
+	var replayHandler *websocket.ReplayHandler
+	if (a.mode == ModeMonolith || a.mode == ModeGateway) && a.eventLog != nil {
+		storeAdapter := eventlog.NewStoreAdapter(a.eventLog)
+		replayer := engine.NewReplayer(storeAdapter)
+		replayHandler = websocket.NewReplayHandler(replayer, a.log)
+		a.log.Underlying().Info().Str("event", "replay_handler_created").Msg("replay handler: initialized")
+	}
+
+	// WAL and Sequencer initialized above (moved to 2c)
 
 	// ── 3. WebSocket Gateway ────────────────────────────────────
 	// Rate limit: 500 new connections/sec per gateway to prevent thundering herd.
 	// Gateway ID is used for sticky session routing verification.
 	// When Redis is enabled, use the distributed router for gateway independence.
-	tmForGateway := topicmanager.Manager(tm)
-	if router != nil {
-		tmForGateway = router
+	if a.mode == ModeMonolith || a.mode == ModeGateway {
+		tmForGateway := topicmanager.Manager(a.tm)
+		if router != nil {
+			tmForGateway = router
+		}
+		gwLogger := log.WebSocketGateway(a.log, a.cfg.Server.GetGatewayID())
+		gw := websocket.NewGatewayWithReplay(tmForGateway, snap, replayHandler, walReplayer, gwLogger, metrics, 500, a.cfg.Server.GetGatewayID())
+		a.gateway = gw
+
+		a.registerComponent(component{
+			name:  "websocket-gateway",
+			order: 30,
+			stop: func(ctx context.Context) error {
+				gw.Shutdown(ctx)
+				a.log.Underlying().Info().
+					Int("connections_drained", gw.ClientCount()).
+					Str("event", "gateway_stopped").
+					Msg("websocket-gateway: stopped")
+				return nil
+			},
+			health: func(ctx context.Context) platform.HealthStatus {
+				count := gw.ClientCount()
+				if count >= websocket.MaxConnections() {
+					return platform.Degraded("at connection limit")
+				}
+				return platform.OK()
+			},
+		})
 	}
-	gwLogger := log.WebSocketGateway(a.log, a.cfg.Server.GetGatewayID())
-	gw := websocket.NewGatewayWithSnapshot(tmForGateway, snap, gwLogger, metrics, 500, a.cfg.Server.GetGatewayID())
-	a.gateway = gw
-	a.registerComponent(component{
-		name:  "websocket-gateway",
-		order: 30,
-		stop: func(ctx context.Context) error {
-			gw.Shutdown(ctx)
-			a.log.Underlying().Info().
-				Int("connections_drained", gw.ClientCount()).
-				Str("event", "gateway_stopped").
-				Msg("websocket-gateway: stopped")
-			return nil
-		},
-		health: func(ctx context.Context) platform.HealthStatus {
-			count := gw.ClientCount()
-			if count >= websocket.MaxConnections() {
-				return platform.Degraded("at connection limit")
-			}
-			return platform.OK()
-		},
-	})
 
 	// ── 4. Redis Client (shared) ───────────────────────────────
 	// Create a single Redis client when Redis is enabled, shared by
@@ -400,7 +545,7 @@ func (a *App) wire() error {
 	// ── 5. Exchange Adapters ──────────────────────────────────────
 	// Only create the exchange manager and pipeline when feed is enabled.
 	// Subscriber-only gateways skip this and only run Redis subscriber + WS gateway.
-	if a.cfg.Feed.Enabled {
+	if (a.mode == ModeMonolith || a.mode == ModePublisher) && a.cfg.Feed.Enabled {
 		// Update simulator config if legacy Feed config options are used.
 		adapters := a.cfg.Exchange.Adapters
 		for i := range adapters {
@@ -491,7 +636,13 @@ func (a *App) wire() error {
 			})
 		} else {
 			// Single-instance mode: publish directly to local TopicManager.
-			publisher = &topicPublisher{tm: tm}
+			if a.tm != nil {
+				publisher = &topicPublisher{tm: a.tm}
+			} else {
+				a.log.Underlying().Warn().Msg("Publisher is running locally but without Redis and without local TopicManager. Events will be dropped.")
+				qCfg := clientqueue.DefaultConfig()
+				publisher = &topicPublisher{tm: topicmanager.NewWithQueue(0, &qCfg, a.log, reg, metrics)} // Dummy TM
+			}
 		}
 
 		// Wrap publisher with persistence layer when database is enabled.
@@ -501,8 +652,16 @@ func (a *App) wire() error {
 			a.log.Underlying().Info().Str("event", "persisting_publisher_active").Msg("event-log: persisting publisher active")
 		}
 
+		// Wrap publisher with WAL layer for fast reconnects
+		if walLog != nil {
+			publisher = wal.NewPublisher(walLog, publisher, a.log)
+			a.log.Underlying().Info().Str("event", "wal_publisher_active").Msg("wal: publishing to write-ahead log")
+		}
+
 		// Wrap publisher with snapshot decorator to maintain in-memory market state.
-		publisher = snapshot.NewSnapshotPublisher(publisher, snap)
+		if snap != nil {
+			publisher = snapshot.NewSnapshotPublisher(publisher, snap)
+		}
 
 		// Choose sequencer implementation: Redis-backed for distributed
 		// consistency when scaled horizontally, in-memory for single instance.
@@ -539,7 +698,7 @@ func (a *App) wire() error {
 	// forwards events to the local TopicManager (or distributed router).
 	// Dynamic subscriptions: only subscribes to Redis channels for
 	// symbols that local clients actually need (gateway independence).
-	if a.cfg.Redis.Enabled {
+	if (a.mode == ModeMonolith || a.mode == ModeGateway) && a.cfg.Redis.Enabled {
 		mode := "subscriber-only mode"
 		if a.cfg.Feed.Enabled {
 			mode = "primary mode (publisher + subscriber)"
@@ -562,12 +721,13 @@ func (a *App) wire() error {
 		// Create Redis subscriber that feeds the local TopicManager.
 		// When distributed router is active, it feeds the router which
 		// manages dynamic Redis subscriptions per local client demand.
-		forwardTarget := topicmanager.Manager(tm)
+		forwardTarget := topicmanager.Manager(a.tm)
 		if router != nil {
 			forwardTarget = router
 		}
 		redisSub := redisbus.NewSubscriber(redisClient, forwardTarget, a.log,
 			redisbus.WithStaleCallback(5*time.Second, staleCallback),
+			redisbus.WithMetrics(a.metrics),
 		)
 		a.redisSub = redisSub
 
@@ -617,7 +777,7 @@ func (a *App) wire() error {
 		routerMetricsUpdate := func() {
 			metrics.DistRedisSubscriptions.Set(float64(router.ActiveRedisSubscriptions()))
 			metrics.DistSymbolsLocalSubs.Set(float64(router.SymbolsWithLocalSubscribers()))
-			metrics.DistEventsRouted.Add(float64(router.EventsRouted()))
+			metrics.MessagesReceivedTotal.Add(float64(router.EventsRouted()))
 		}
 		routerMetricsUpdate()
 	}
@@ -626,7 +786,7 @@ func (a *App) wire() error {
 	// When discovery is enabled, register this gateway in the Redis
 	// registry with a TTL heartbeat. Other gateways and load balancers
 	// can query /gateways to discover active instances.
-	if a.cfg.Discovery.Enabled {
+	if (a.mode == ModeMonolith || a.mode == ModeGateway) && a.cfg.Discovery.Enabled {
 		// Determine which Redis client to use for discovery.
 		var regRedis *redis.Client
 		if redisClient != nil {
@@ -654,6 +814,15 @@ func (a *App) wire() error {
 			reg := discovery.NewRegistry(regRedis, a.log, opts...)
 			a.registry = reg
 
+			// Initialize routing components
+			ring := routing.NewConsistentHashRing(100) // 100 vnodes per gateway
+			pm := routing.NewPartitionManager(25600, ring)
+			a.partitionMgr = pm
+
+			adapter := &discoveryRegistryAdapter{r: reg}
+			a.routingEngine = routing.NewEngine(a.cfg.Server.GetGatewayID(), adapter, pm, 1*time.Second)
+			a.gateway.SetRedirector(a.routingEngine)
+
 			gatewayInfo := discovery.GatewayInfo{
 				ID:            a.cfg.Server.GetGatewayID(),
 				Addr:          a.cfg.Server.Host,
@@ -666,28 +835,28 @@ func (a *App) wire() error {
 			a.registerComponent(component{
 				name:  "service-discovery",
 				order: 28, // after redis-subscriber, before http-server
-			start: func(ctx context.Context) error {
-				// Register with background context (startup ctx has 10s timeout).
-				if err := reg.Register(context.Background(), gatewayInfo); err != nil {
-					return fmt.Errorf("discovery register: %w", err)
-				}
-				a.log.Underlying().Info().
-					Str("id", gatewayInfo.ID).
-					Dur("ttl", reg.TTL()).
-					Dur("heartbeat", reg.HeartbeatInterval()).
-					Str("event", "service_discovery_registered").
-					Msg("service discovery: registered")
-				return nil
-			},
-			stop: func(ctx context.Context) error {
-				// Stop heartbeat before deregistering.
-				reg.StopHeartbeat()
-				if err := reg.Deregister(ctx, a.cfg.Server.GetGatewayID()); err != nil {
-					a.log.Underlying().Warn().Err(err).Str("event", "deregister_failed").Msg("service discovery: deregister failed")
-				}
-				a.log.Underlying().Info().Str("event", "service_discovery_deregistered").Msg("service discovery: deregistered")
-				return nil
-			},
+				start: func(ctx context.Context) error {
+					// Register with background context (startup ctx has 10s timeout).
+					if err := reg.Register(context.Background(), gatewayInfo); err != nil {
+						return fmt.Errorf("discovery register: %w", err)
+					}
+					a.log.Underlying().Info().
+						Str("id", gatewayInfo.ID).
+						Dur("ttl", reg.TTL()).
+						Dur("heartbeat", reg.HeartbeatInterval()).
+						Str("event", "service_discovery_registered").
+						Msg("service discovery: registered")
+					return nil
+				},
+				stop: func(ctx context.Context) error {
+					// Stop heartbeat before deregistering.
+					reg.StopHeartbeat()
+					if err := reg.Deregister(ctx, a.cfg.Server.GetGatewayID()); err != nil {
+						a.log.Underlying().Warn().Err(err).Str("event", "deregister_failed").Msg("service discovery: deregister failed")
+					}
+					a.log.Underlying().Info().Str("event", "service_discovery_deregistered").Msg("service discovery: deregistered")
+					return nil
+				},
 				health: func(ctx context.Context) platform.HealthStatus {
 					count, err := reg.Count(ctx)
 					if err != nil {
@@ -699,6 +868,25 @@ func (a *App) wire() error {
 					return platform.OK()
 				},
 			})
+
+			a.registerComponent(component{
+				name:  "routing-engine",
+				order: 29, // immediately after discovery
+				start: func(ctx context.Context) error {
+					a.routingEngine.Start(ctx)
+					a.log.Underlying().Info().Str("event", "routing_engine_started").Msg("routing engine: started")
+					return nil
+				},
+				stop: func(ctx context.Context) error {
+					a.routingEngine.Stop()
+					a.log.Underlying().Info().Str("event", "routing_engine_stopped").Msg("routing engine: stopped")
+					return nil
+				},
+				health: func(ctx context.Context) platform.HealthStatus {
+					return platform.OK()
+				},
+			})
+
 		} else {
 			a.log.Underlying().Warn().Str("event", "discovery_disabled").Msg("service discovery requires redis — disabled")
 		}
@@ -736,7 +924,9 @@ func (a *App) wire() error {
 	}
 
 	// Register Gateway check (capability only, not capacity — see health_check_review.md)
-	a.healthRegistry.Register(healthcheck.GatewayCheck(gw))
+	if a.gateway != nil {
+		a.healthRegistry.Register(healthcheck.GatewayCheck(a.gateway))
+	}
 
 	a.log.Underlying().Info().
 		Int("checks", len(a.healthRegistry.Checks())).
@@ -747,7 +937,11 @@ func (a *App) wire() error {
 	// Log level changer allows dynamic log level changes via HTTP.
 	// Critical for incident response — enables DEBUG without restart.
 	logChanger := &logLevelChanger{logger: a.log}
-	httpRouter := transport.NewRouter(a.cfg, gw, a.log, metrics, gatherer, a, a.registry, a.eventLog, a.healthRegistry, a.heartbeat, logChanger)
+	var gwHealth *websocket.HealthMonitor
+	if a.gateway != nil {
+		gwHealth = websocket.NewHealthMonitor(a.gateway)
+	}
+	httpRouter := transport.NewRouter(a.cfg, a.gateway, a.log, metrics, gatherer, a, a.registry, a.eventLog, a.healthRegistry, a.heartbeat, gwHealth, logChanger)
 
 	// Custom listener with TCP tuning for WebSocket workloads.
 	// Enables TCP keepalive and sets larger read/write buffers to handle

@@ -11,8 +11,8 @@ import (
 	"github.com/rs/zerolog"
 	"github.com/sumit/rtmds/internal/clientqueue"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 const (
@@ -41,6 +41,7 @@ type shard struct {
 type subscriber struct {
 	ch     chan *marketdata.CachedEvent
 	done   chan struct{} // closed on unsubscribe
+	mu     sync.Mutex
 	topics map[Topic]struct{}
 	closed atomic.Bool
 	handle Handle // back-pointer to the handle returned by Subscribe
@@ -218,6 +219,9 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 		ss.mu.Unlock()
 	}
 
+	sub.mu.Lock()
+	defer sub.mu.Unlock()
+
 	for _, t := range topics {
 		if _, ok := sub.topics[t]; ok {
 			continue
@@ -248,7 +252,7 @@ func (tm *MemoryManager) Subscribe(id ID, topics ...Topic) Handle {
 			newSubs := make([]*subscriber, 0, len(oldSubs)+1)
 			newSubs = append(newSubs, oldSubs...)
 			newSubs = append(newSubs, sub)
-			
+
 			// CompareAndSwap ensures we only commit if the list hasn't changed
 			if ap.CompareAndSwap(oldList, &subList{subs: newSubs}) {
 				break
@@ -285,6 +289,9 @@ func (tm *MemoryManager) Unsubscribe(id ID) {
 	}
 	delete(ss.subs, id)
 	ss.mu.Unlock()
+
+	sub.mu.Lock()
+	defer sub.mu.Unlock()
 
 	// Remove from every topic shard via COW.
 	for t := range sub.topics {
@@ -397,11 +404,12 @@ func (tm *MemoryManager) Publish(_ context.Context, event marketdata.MarketEvent
 	// per-subscriber labels).
 	if tm.appMetrics != nil {
 		if sent > 0 {
-			tm.appMetrics.BroadcastsTotal.Add(float64(sent))
+			tm.appMetrics.MessagesPublishedTotal.Add(float64(sent))
 		}
 		if dropped > 0 {
-			tm.appMetrics.EventsDroppedTotal.Add(float64(dropped))
+			tm.appMetrics.DroppedMessagesTotal.Add(float64(dropped))
 		}
+		tm.appMetrics.BroadcastDurationSeconds.Observe(time.Since(start).Seconds())
 	}
 }
 

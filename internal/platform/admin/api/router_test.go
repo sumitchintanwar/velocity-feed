@@ -10,7 +10,7 @@ import (
 	"github.com/sumit/rtmds/internal/platform/admin/commands"
 	"github.com/sumit/rtmds/internal/platform/admin/middleware"
 	"github.com/sumit/rtmds/internal/platform/lifecycle"
-	
+
 	"go.uber.org/zap"
 )
 
@@ -41,8 +41,8 @@ func TestRouter_Integration(t *testing.T) {
 	maintCtrl := &commands.MockMaintenanceController{}
 
 	cfg := RouterConfig{
-		Manager:               manager,
-		Version:               "1.0.0",
+		Manager: manager,
+		Version: "1.0.0",
 		Authenticator: &middleware.StaticTokenAuthenticator{
 			AdminToken:    "admin",
 			OperatorToken: "operator",

@@ -14,7 +14,7 @@ package topicmanager
 import (
 	"context"
 
-	"github.com/sumit/rtmds/internal/marketdata"
+	"github.com/sumit/rtmds/pkg/marketdata"
 )
 
 // ID is an opaque subscriber identifier (typically a client UUID).

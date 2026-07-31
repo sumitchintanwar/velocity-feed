@@ -29,7 +29,7 @@ func newBenchRouter(b *testing.B) http.Handler {
 	cfg := &config.Config{
 		Metrics: config.MetricsConfig{Enabled: true, Path: "/metrics"},
 	}
-	return NewRouter(cfg, gw, logger, metrics, gatherer, &benchHealthReporter{}, nil, nil, nil, nil, nil)
+	return NewRouter(cfg, gw, logger, metrics, gatherer, &benchHealthReporter{}, nil, nil, nil, nil, nil, nil)
 }
 
 // ---------- Health Endpoint ----------

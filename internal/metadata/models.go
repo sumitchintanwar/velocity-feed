@@ -26,15 +26,15 @@ const (
 
 // Instrument represents the complete canonical reference data for a symbol.
 type Instrument struct {
-	CanonicalSymbol string        `json:"canonical_symbol"`
-	ExchangeSymbol  string        `json:"exchange_symbol"`
-	Exchange        string        `json:"exchange"`
-	AssetClass      AssetClass    `json:"asset_class"`
-	BaseCurrency    string        `json:"base_currency"`
-	QuoteCurrency   string        `json:"quote_currency"`
-	TradingStatus   TradingStatus `json:"trading_status"`
-	TickSize        float64       `json:"tick_size"`
-	LotSize         float64       `json:"lot_size"`
-	InstrumentName  string        `json:"instrument_name"`
+	CanonicalSymbol string         `json:"canonical_symbol"`
+	ExchangeSymbol  string         `json:"exchange_symbol"`
+	Exchange        string         `json:"exchange"`
+	AssetClass      AssetClass     `json:"asset_class"`
+	BaseCurrency    string         `json:"base_currency"`
+	QuoteCurrency   string         `json:"quote_currency"`
+	TradingStatus   TradingStatus  `json:"trading_status"`
+	TickSize        float64        `json:"tick_size"`
+	LotSize         float64        `json:"lot_size"`
+	InstrumentName  string         `json:"instrument_name"`
 	Extensions      map[string]any `json:"extensions,omitempty"`
 }

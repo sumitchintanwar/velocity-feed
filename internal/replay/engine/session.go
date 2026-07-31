@@ -222,7 +222,7 @@ func (s *Session) streamEvents(ctx context.Context, start, end time.Time) error 
 	}
 	var prefetchWg sync.WaitGroup
 	prefetchWg.Add(1)
-	
+
 	defer func() {
 		// Close iterator to unblock any pending Next() calls on real storage backends.
 		iterator.Close()

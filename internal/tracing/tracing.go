@@ -45,10 +45,10 @@ type Config struct {
 // Tracer wraps an OpenTelemetry Tracer and provides convenience methods
 // for starting spans with consistent service attributes.
 type Tracer struct {
-	tracer     trace.Tracer
-	provider   *sdktrace.TracerProvider
-	resource   *resource.Resource
-	noop       bool // true when tracing is disabled
+	tracer   trace.Tracer
+	provider *sdktrace.TracerProvider
+	resource *resource.Resource
+	noop     bool // true when tracing is disabled
 }
 
 // InitTracer initializes the OpenTelemetry SDK and returns a Tracer.
@@ -123,9 +123,9 @@ func InitTracer(cfg Config) (*Tracer, func(context.Context) error, error) {
 
 	tp := sdktrace.NewTracerProvider(
 		sdktrace.WithBatcher(exporter,
-			sdktrace.WithBatchTimeout(5*time.Second),   // flush every 5s
-			sdktrace.WithMaxExportBatchSize(512),        // batch size for OTLP
-			sdktrace.WithMaxQueueSize(2048),             // queue capacity
+			sdktrace.WithBatchTimeout(5*time.Second), // flush every 5s
+			sdktrace.WithMaxExportBatchSize(512),     // batch size for OTLP
+			sdktrace.WithMaxQueueSize(2048),          // queue capacity
 		),
 		sdktrace.WithResource(res),
 		sdktrace.WithSampler(sampler),
@@ -152,9 +152,9 @@ func InitTracer(cfg Config) (*Tracer, func(context.Context) error, error) {
 //
 // Usage:
 //
-//   ctx, span := tracing.StartSpan(ctx, "gateway.connect")
-//   defer span.End()
-//   // ... do work
+//	ctx, span := tracing.StartSpan(ctx, "gateway.connect")
+//	defer span.End()
+//	// ... do work
 func StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
 	return tracerFromContext(ctx).Start(ctx, name, opts...)
 }

@@ -13,10 +13,10 @@ import (
 
 // Metrics encapsulates all client-facing business metrics for the Gateway.
 type Metrics struct {
-	ActiveConnections    interfaces.Gauge
-	ActiveSubscriptions  interfaces.Gauge
-	ReconnectsTotal      interfaces.Counter
-	DisconnectsTotal     interfaces.Counter
+	ActiveConnections   interfaces.Gauge
+	ActiveSubscriptions interfaces.Gauge
+	ReconnectsTotal     interfaces.Counter
+	DisconnectsTotal    interfaces.Counter
 }
 
 // NewMetrics instantiates and registers the Gateway metric group.
@@ -47,7 +47,7 @@ func NewMetrics(f *factory.Factory) (*Metrics, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to register gateway_reconnects_total: %w", err)
 	}
-	
+
 	disconnects, err := f.NewCounter(
 		"marketdata_gateway_disconnects_total",
 		"Total number of client disconnections (clean or dropped)",

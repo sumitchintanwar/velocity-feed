@@ -11,9 +11,10 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/sumit/rtmds/internal/log"
-	"github.com/sumit/rtmds/internal/marketdata"
 	"github.com/sumit/rtmds/internal/platform"
 	"github.com/sumit/rtmds/internal/topicmanager"
+	"github.com/sumit/rtmds/pkg/marketdata"
+	"github.com/sumit/rtmds/pkg/protocol"
 )
 
 // --- Test helpers ---
@@ -66,6 +67,114 @@ func TestGateway_ConnectAndDisconnect(t *testing.T) {
 	conn.Close()
 	if !waitForClientCount(gw, 0, 2*time.Second) {
 		t.Errorf("expected 0 clients after close, got %d", gw.ClientCount())
+	}
+}
+
+func TestGateway_ProtocolNegotiation(t *testing.T) {
+	gw, _ := setupTestGateway(t)
+	ts := httptest.NewServer(gw.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+
+	// Create a dialer that specifies subprotocols without mutating the global DefaultDialer
+	dialer := *websocket.DefaultDialer
+	dialer.Subprotocols = []string{"v1.protobuf.rtmds", "v1.json.rtmds"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	conn, resp, err := dialer.DialContext(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	// Verify the server negotiated Protobuf
+	negotiated := resp.Header.Get("Sec-WebSocket-Protocol")
+	if negotiated != "v1.protobuf.rtmds" {
+		t.Errorf("expected v1.protobuf.rtmds, got %q", negotiated)
+	}
+}
+
+func TestGateway_ProtobufSerialization(t *testing.T) {
+	gw, tm := setupTestGateway(t)
+	ts := httptest.NewServer(gw.Handler())
+	defer ts.Close()
+
+	wsURL := "ws" + strings.TrimPrefix(ts.URL, "http") + "/ws"
+
+	dialer := *websocket.DefaultDialer
+	dialer.Subprotocols = []string{"v1.protobuf.rtmds"}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+
+	conn, resp, err := dialer.DialContext(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("dial failed: %v", err)
+	}
+	defer conn.Close()
+
+	if resp.Header.Get("Sec-WebSocket-Protocol") != "v1.protobuf.rtmds" {
+		t.Fatalf("expected protobuf negotiation")
+	}
+
+	// 1. Send subscription (JSON control message)
+	subMsg := ClientMessage{
+		Action:  "subscribe",
+		Symbols: []string{"AAPL"},
+	}
+	if err := conn.WriteJSON(subMsg); err != nil {
+		t.Fatalf("write subscribe: %v", err)
+	}
+
+	// Read confirmation (Control messages are still JSON)
+	var conf ServerMessage
+	if err := conn.ReadJSON(&conf); err != nil {
+		t.Fatalf("read confirmation: %v", err)
+	}
+
+	// 2. Publish a live quote
+	quote := marketdata.Quote{
+		Symbol:    "AAPL",
+		Type:      marketdata.QuoteTypeTrade,
+		Price:     150.25,
+		Volume:    100,
+		Timestamp: time.Now(),
+	}
+	// Note: the feed layer usually wraps this in a CachedEvent.
+	// We'll publish the raw event directly, tm will encode it (which only encodes JSON).
+	// But our Protobuf serializer will dynamically serialize it!
+	tm.Publish(context.Background(), marketdata.NewCachedEvent(&quote))
+
+	// 3. Read the binary protobuf event
+	msgType, b, err := conn.ReadMessage()
+	if err != nil {
+		t.Fatalf("read message: %v", err)
+	}
+	if msgType != websocket.BinaryMessage {
+		t.Errorf("expected binary message for protobuf, got %d", msgType)
+	}
+
+	// Deserialize using the actual protocol layer to verify
+	serializer := protocol.NewProtobufSerializer()
+	ev, err := serializer.Deserialize(b)
+	if err != nil {
+		t.Fatalf("failed to deserialize protobuf: %v", err)
+	}
+
+	if ev.EventSymbol() != "AAPL" {
+		t.Errorf("expected AAPL, got %v", ev.EventSymbol())
+	}
+
+	trade, ok := ev.(*marketdata.Quote)
+	if !ok {
+		t.Errorf("expected Quote, got %T", ev)
+	} else {
+		if trade.Price != 150.25 {
+			t.Errorf("expected price 150.25, got %v", trade.Price)
+		}
 	}
 }
 
@@ -420,6 +529,7 @@ func TestGateway_Shutdown(t *testing.T) {
 	conns := make([]*websocket.Conn, n)
 	for i := 0; i < n; i++ {
 		conns[i] = dialWS(t, wsURL)
+		t.Logf("Dialed client %d, count: %d", i+1, gw.ClientCount())
 	}
 
 	if !waitForClientCount(gw, n, 5*time.Second) {
@@ -517,12 +627,12 @@ func TestHeartbeatManager_RegisterUnregister(t *testing.T) {
 	metrics, _ := platform.NewMetrics("test_hb")
 	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 0)
 
-	hm.Register("client-1", func() {})
+	hm.Register("client-1", func() {}, nil)
 	if hm.ClientCount() != 1 {
 		t.Fatalf("expected 1, got %d", hm.ClientCount())
 	}
 
-	hm.Register("client-2", func() {})
+	hm.Register("client-2", func() {}, nil)
 	if hm.ClientCount() != 2 {
 		t.Fatalf("expected 2, got %d", hm.ClientCount())
 	}
@@ -545,7 +655,7 @@ func TestHeartbeatManager_RecordPingPong(t *testing.T) {
 	timeoutFired := make(chan struct{}, 1)
 	hm.Register("client-1", func() {
 		timeoutFired <- struct{}{}
-	})
+	}, nil)
 
 	// Record a ping, then a pong — should not trigger timeout.
 	hm.RecordPing("client-1")
@@ -565,13 +675,13 @@ func TestHeartbeatManager_RecordPingPong(t *testing.T) {
 
 func TestHeartbeatManager_TimeoutDetection(t *testing.T) {
 	metrics, _ := platform.NewMetrics("test_hb")
-	// Use very short timeout for fast test.
-	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 50*time.Millisecond)
+	l := log.New(nil, "test")
+	hm := NewHeartbeatManager(l, metrics, 50*time.Millisecond, 2)
 
 	timeoutFired := make(chan struct{}, 1)
 	hm.Register("client-1", func() {
 		timeoutFired <- struct{}{}
-	})
+	}, nil)
 
 	// Record a ping but never send a pong.
 	hm.RecordPing("client-1")
@@ -592,12 +702,13 @@ func TestHeartbeatManager_TimeoutDetection(t *testing.T) {
 
 func TestHeartbeatManager_NoPingNoTimeout(t *testing.T) {
 	metrics, _ := platform.NewMetrics("test_hb")
-	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 10*time.Millisecond)
+	l := log.New(nil, "test")
+	hm := NewHeartbeatManager(l, metrics, 10*time.Millisecond, 2)
 
 	timeoutFired := make(chan struct{}, 1)
 	hm.Register("client-1", func() {
 		timeoutFired <- struct{}{}
-	})
+	}, nil)
 
 	// No ping sent — should not trigger timeout (only outstanding pings count).
 	hm.checkTimeouts()
@@ -614,7 +725,7 @@ func TestHeartbeatManager_MultiplePingsBeforePong(t *testing.T) {
 	metrics, _ := platform.NewMetrics("test_hb")
 	hm := NewHeartbeatManager(log.New(nil, "test"), metrics, 0, 0)
 
-	hm.Register("client-1", func() {})
+	hm.Register("client-1", func() {}, nil)
 
 	// Send 3 pings without pong — each should increment the counter.
 	hm.RecordPing("client-1")

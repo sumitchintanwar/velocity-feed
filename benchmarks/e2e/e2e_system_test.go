@@ -137,7 +137,6 @@ func TestEndToEndSystem(t *testing.T) {
 	pub := redisbus.NewPublisher(rdb, applog.NewFromLegacy("info", "json", "e2e-test"))
 	defer pub.Close()
 
-
 	log.Printf("Starting E2E benchmark run for 5 seconds...")
 	start := time.Now()
 
@@ -149,10 +148,10 @@ func TestEndToEndSystem(t *testing.T) {
 			Price:     150.0 + float64(publishCount%10),
 			Timestamp: time.Now(), // E2E TIMESTAMP
 		}
-		
+
 		ev := marketdata.NewCachedEvent(quote)
 		pub.Publish(context.Background(), ev)
-		
+
 		publishCount++
 		time.Sleep(50 * time.Microsecond) // Prevent overwhelming miniredis
 	}

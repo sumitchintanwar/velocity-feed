@@ -196,7 +196,7 @@ func (p *Pool) worker(ctx context.Context, id int) {
 						Interface("panic", r).
 						Str("event", "worker_panic_recovered").
 						Msg("worker panic recovered")
-						
+
 					// If panic occurred during Publish, ensure we still clean up metrics
 					if processing {
 						p.stats.Processed.Add(1)
@@ -222,7 +222,7 @@ func (p *Pool) worker(ctx context.Context, id int) {
 						p.metrics.QueueDepth.Dec()
 						p.metrics.ActiveWorkers.Inc()
 					}
-					
+
 					start = time.Now()
 					processing = true
 

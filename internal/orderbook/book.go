@@ -74,7 +74,7 @@ func applyLevel(levels []PriceLevel, update LevelUpdate, isBid bool) []PriceLeve
 			if len(levels) < MaxDepth {
 				levels = append(levels, PriceLevel{})
 			}
-			
+
 			if idx < len(levels)-1 {
 				copy(levels[idx+1:], levels[idx:len(levels)-1])
 			}

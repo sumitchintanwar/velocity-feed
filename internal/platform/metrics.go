@@ -26,26 +26,26 @@ type Metrics struct {
 	SubscriptionEvents     *prometheus.CounterVec
 
 	// WebSocket layer
-	ActiveConnections           prometheus.Gauge
-	WSConnectionsOpened         prometheus.Counter
-	WSConnectionsClosed         prometheus.Counter
-	WSConnectionAttempts        prometheus.Counter
-	WSActiveSubscriptions       prometheus.Gauge
-	WSSlowConsumers             prometheus.Gauge
-	MessagesSentTotal           prometheus.Counter
-	WebsocketWriteErrorsTotal   prometheus.Counter
-	WSBytesSent                 prometheus.Counter
-	WSMessageSize               prometheus.Histogram
-	WSDeliveryLatency           prometheus.Histogram
-	WSPingLatency               prometheus.Histogram
-	WSPingSentTotal             prometheus.Counter
-	WSPongReceivedTotal         prometheus.Counter
-	WSTimeoutsTotal             prometheus.Counter
-	WSHeartbeatCleanupsTotal    prometheus.Counter
-	WSAuthFailures              prometheus.Counter
-	WSHandshakeDuration         prometheus.Histogram
-	ConnectionDurationSeconds   prometheus.Histogram
-	BroadcastDurationSeconds    prometheus.Histogram
+	ActiveConnections         prometheus.Gauge
+	WSConnectionsOpened       prometheus.Counter
+	WSConnectionsClosed       prometheus.Counter
+	WSConnectionAttempts      prometheus.Counter
+	WSActiveSubscriptions     prometheus.Gauge
+	WSSlowConsumers           prometheus.Gauge
+	MessagesSentTotal         prometheus.Counter
+	WebsocketWriteErrorsTotal prometheus.Counter
+	WSBytesSent               prometheus.Counter
+	WSMessageSize             prometheus.Histogram
+	WSDeliveryLatency         prometheus.Histogram
+	WSPingLatency             prometheus.Histogram
+	WSPingSentTotal           prometheus.Counter
+	WSPongReceivedTotal       prometheus.Counter
+	WSTimeoutsTotal           prometheus.Counter
+	WSHeartbeatCleanupsTotal  prometheus.Counter
+	WSAuthFailures            prometheus.Counter
+	WSHandshakeDuration       prometheus.Histogram
+	ConnectionDurationSeconds prometheus.Histogram
+	BroadcastDurationSeconds  prometheus.Histogram
 
 	// Reconnect layer
 	WSReconnectAttemptsTotal prometheus.Counter
@@ -62,13 +62,13 @@ type Metrics struct {
 	HTTPRequestDuration *prometheus.HistogramVec
 
 	// Distributed routing
-	DistRedisSubscriptions       prometheus.Gauge       // current Redis channel subscriptions
-	DistRedisSubscribeOps        prometheus.Counter     // total Redis SUBSCRIBE commands
-	DistRedisUnsubscribeOps      prometheus.Counter     // total Redis UNSUBSCRIBE commands
-	MessagesReceivedTotal        prometheus.Counter     // events received from Redis and routed locally
-	DistSymbolsLocalSubs         prometheus.Gauge       // current symbols with local subscribers
-	DistSubscriptionEvents       *prometheus.CounterVec // labels: action (subscribe/unsubscribe)
-	RedisReceiveLatencySeconds   prometheus.Histogram
+	DistRedisSubscriptions     prometheus.Gauge       // current Redis channel subscriptions
+	DistRedisSubscribeOps      prometheus.Counter     // total Redis SUBSCRIBE commands
+	DistRedisUnsubscribeOps    prometheus.Counter     // total Redis UNSUBSCRIBE commands
+	MessagesReceivedTotal      prometheus.Counter     // events received from Redis and routed locally
+	DistSymbolsLocalSubs       prometheus.Gauge       // current symbols with local subscribers
+	DistSubscriptionEvents     *prometheus.CounterVec // labels: action (subscribe/unsubscribe)
+	RedisReceiveLatencySeconds prometheus.Histogram
 
 	// Gateway Lifecycle
 	GatewayState                 prometheus.Gauge

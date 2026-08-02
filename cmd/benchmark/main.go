@@ -172,15 +172,15 @@ type BenchmarkResult struct {
 
 // LatencyStats holds latency statistics.
 type LatencyStats struct {
-	MeanMs float64 `json:"mean_ms"`
+	MeanMs   float64 `json:"mean_ms"`
 	MedianMs float64 `json:"median_ms"`
-	MinMs  float64 `json:"min_ms"`
-	MaxMs  float64 `json:"max_ms"`
-	P50Ms  float64 `json:"p50_ms"`
-	P90Ms  float64 `json:"p90_ms"`
-	P95Ms  float64 `json:"p95_ms"`
-	P99Ms  float64 `json:"p99_ms"`
-	P999Ms float64 `json:"p999_ms"`
+	MinMs    float64 `json:"min_ms"`
+	MaxMs    float64 `json:"max_ms"`
+	P50Ms    float64 `json:"p50_ms"`
+	P90Ms    float64 `json:"p90_ms"`
+	P95Ms    float64 `json:"p95_ms"`
+	P99Ms    float64 `json:"p99_ms"`
+	P999Ms   float64 `json:"p999_ms"`
 }
 
 // HistogramBucket holds one bucket of the latency histogram.
@@ -293,7 +293,7 @@ func main() {
 		clients = append(clients, conn)
 		clientsMu.Unlock()
 		connected.Add(1)
-		
+
 		curr := connected.Load()
 		for {
 			peak := peakConnected.Load()

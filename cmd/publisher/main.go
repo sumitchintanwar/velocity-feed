@@ -32,11 +32,11 @@ func main() {
 		_, _ = os.Stderr.WriteString(fmt.Sprintf("config error: %v\n", err))
 		os.Exit(1)
 	}
-	
+
 	// Publisher-specific config overrides
-	cfg.Feed.Enabled = true // Publisher must run the feed
+	cfg.Feed.Enabled = true       // Publisher must run the feed
 	cfg.Discovery.Enabled = false // Publisher doesn't need to register as a gateway
-	cfg.Redis.Enabled = true // Must publish to Redis
+	cfg.Redis.Enabled = true      // Must publish to Redis
 
 	if cfg.Profiling.Enabled {
 		runtime.SetMutexProfileFraction(cfg.Profiling.MutexFraction)

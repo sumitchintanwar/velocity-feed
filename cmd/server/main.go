@@ -59,7 +59,7 @@ func main() {
 	}
 
 	// ── 3. Build application (wire dependencies) ────────────────
-	
+
 	// Inject serializers into marketdata package for zero-copy broadcasting
 	marketdata.ProtobufEncoder = protocol.NewProtobufSerializer()
 	marketdata.FlatBuffersEncoder = protocol.NewFlatBuffersSerializer()

@@ -208,7 +208,7 @@ func BenchmarkPipeline_Scaling(b *testing.B) {
 
 			b.ResetTimer()
 			b.ReportAllocs()
-			
+
 			target := int64(b.N)
 			for count.Load() < target {
 				time.Sleep(100 * time.Microsecond)

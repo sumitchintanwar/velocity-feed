@@ -32,13 +32,13 @@ import (
 //	Unsubscribe(sym) → unsubscribes when no local clients need the symbol
 //	Stop()           → graceful shutdown, waits for in-flight messages
 type Subscriber struct {
-	client *redis.Client
-	prefix string
-	tm     topicmanager.Manager
-	log    *log.Logger
+	client  *redis.Client
+	prefix  string
+	tm      topicmanager.Manager
+	log     *log.Logger
 	metrics *platform.Metrics // optional; nil disables instrumentation
-	cancel context.CancelFunc
-	doneCh chan struct{}
+	cancel  context.CancelFunc
+	doneCh  chan struct{}
 
 	// Channel management.
 	channels   map[string]struct{} // symbols we're subscribed to

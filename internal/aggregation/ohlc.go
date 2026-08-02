@@ -85,4 +85,3 @@ func (a *OHLCAggregator) ForceFlush() []*OHLC {
 func (a *OHLCAggregator) alignTime(t time.Time) time.Time {
 	return t.Truncate(time.Duration(a.windowSize))
 }
-

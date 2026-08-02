@@ -580,11 +580,11 @@ func (s *Service) loadCheckpointFrom(path string) error {
 // Recover loads the checkpoint and replays missing events from the event log.
 // Implements the "Subscribe first, buffer, then Replay" pattern:
 //
-//	1. Start buffering live events
-//	2. Load checkpoint
-//	3. Replay DB events up to cursor
-//	4. Stop buffering (drains live events)
-//	5. Mark Ready
+//  1. Start buffering live events
+//  2. Load checkpoint
+//  3. Replay DB events up to cursor
+//  4. Stop buffering (drains live events)
+//  5. Mark Ready
 //
 // This prevents the race where events arrive via live stream during
 // DB replay and are silently dropped.

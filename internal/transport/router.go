@@ -96,7 +96,7 @@ func NewRouter(
 	r.Get("/liveness", handleLiveness(healthRegistry, heartbeat, gatewayID))
 	r.Get("/readiness", handleReadiness(healthRegistry, gatewayID))
 	r.Get("/health/gateway", handleGatewayHealth(gwHealth))
-	
+
 	if gw != nil {
 		r.Get("/ws", gw.Handler())
 	}

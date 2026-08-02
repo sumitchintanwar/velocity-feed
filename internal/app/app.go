@@ -433,50 +433,50 @@ func (a *App) wire() error {
 			))
 		}
 		snap = snapshot.New(snapOpts...)
-	a.registerComponent(component{
-		name:  "snapshot-service",
-		order: 25,
-		start: func(ctx context.Context) error {
-			snap.Start(ctx)
+		a.registerComponent(component{
+			name:  "snapshot-service",
+			order: 25,
+			start: func(ctx context.Context) error {
+				snap.Start(ctx)
 
-			// Recovery: load checkpoint + replay missing events.
-			if walLog != nil {
-				recoverer := recovery.NewWALRecoverer(snap, walLog)
-				if _, err := recoverer.Recover(ctx); err != nil {
-					snapLogger.Underlying().Warn().Err(err).Str("event", "wal_recovery_failed").Msg("snapshot-service: WAL recovery failed, starting fresh")
+				// Recovery: load checkpoint + replay missing events.
+				if walLog != nil {
+					recoverer := recovery.NewWALRecoverer(snap, walLog)
+					if _, err := recoverer.Recover(ctx); err != nil {
+						snapLogger.Underlying().Warn().Err(err).Str("event", "wal_recovery_failed").Msg("snapshot-service: WAL recovery failed, starting fresh")
+					}
+				} else {
+					var repo eventlog.Repository
+					if a.eventLog != nil {
+						repo = a.eventLog
+					}
+					if rErr := snap.Recover(ctx, repo); rErr != nil {
+						snapLogger.Underlying().Warn().Err(rErr).Str("event", "recovery_failed").Msg("snapshot-service: postgres recovery failed, starting fresh")
+					}
 				}
-			} else {
-				var repo eventlog.Repository
-				if a.eventLog != nil {
-					repo = a.eventLog
-				}
-				if rErr := snap.Recover(ctx, repo); rErr != nil {
-					snapLogger.Underlying().Warn().Err(rErr).Str("event", "recovery_failed").Msg("snapshot-service: postgres recovery failed, starting fresh")
-				}
-			}
 
-			snap.MarkReady()
-			snapLogger.Underlying().Info().
-				Int("symbols", snap.Count()).
-				Str("event", "snapshot_service_started").
-				Msg("snapshot-service: started and ready")
-			return nil
-		},
-		stop: func(ctx context.Context) error {
-			snap.Stop()
-			snapLogger.Underlying().Info().
-				Int("symbols", snap.Count()).
-				Str("event", "snapshot_service_stopped").
-				Msg("snapshot-service: stopped")
-			return nil
-		},
-		health: func(ctx context.Context) platform.HealthStatus {
-			if !snap.IsReady() {
-				return platform.Degraded("warming up")
-			}
-			return platform.OK()
-		},
-	})
+				snap.MarkReady()
+				snapLogger.Underlying().Info().
+					Int("symbols", snap.Count()).
+					Str("event", "snapshot_service_started").
+					Msg("snapshot-service: started and ready")
+				return nil
+			},
+			stop: func(ctx context.Context) error {
+				snap.Stop()
+				snapLogger.Underlying().Info().
+					Int("symbols", snap.Count()).
+					Str("event", "snapshot_service_stopped").
+					Msg("snapshot-service: stopped")
+				return nil
+			},
+			health: func(ctx context.Context) platform.HealthStatus {
+				if !snap.IsReady() {
+					return platform.Degraded("warming up")
+				}
+				return platform.OK()
+			},
+		})
 	}
 
 	// ── 2e. Replay Handler ────────────────────────────────────────
@@ -952,7 +952,7 @@ func (a *App) wire() error {
 	tunedLn := &tcpKeepAliveListener{ln.(*net.TCPListener)}
 
 	srv := &http.Server{
-		Handler:        httpRouter,
+		Handler: httpRouter,
 		// ReadTimeout and WriteTimeout are explicitly disabled (set to 0) to prevent
 		// the global HTTP server timeouts from forcefully closing long-lived WebSocket
 		// connections. WebSocket connections manage their own deadlines via ping/pong.

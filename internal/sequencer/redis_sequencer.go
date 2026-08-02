@@ -97,7 +97,7 @@ func (r *RedisSequencer) ResetSymbols(symbols ...string) {
 		r.resetAll()
 		return
 	}
-	
+
 	r.mu.Lock()
 	for _, sym := range symbols {
 		delete(r.blocks, sym)

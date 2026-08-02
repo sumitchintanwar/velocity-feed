@@ -1,0 +1,75 @@
+namespace rtmds.marketdata.v1;
+
+// Side represents the side of a market event.
+// Backed by a byte for optimal layout.
+enum Side : byte {
+  Unspecified = 0,
+  Buy = 1,
+  Sell = 2
+}
+
+// Level represents a single price level in an order book.
+// Structs are contiguous in memory but cannot be extended.
+// This is optimal for large arrays of price/volume pairs (zero-allocation).
+struct Level {
+  price: double;
+  volume: double;
+}
+
+// Tick represents a single trade execution or quote update.
+table Tick {
+  price: double;
+  volume: double;
+  side: Side = Unspecified;
+  exchange: string;
+  trade_id: string; // Optional unique trade identifier
+}
+
+// OrderBookUpdate represents a change to the L2/L3 order book.
+table OrderBookUpdate {
+  bids: [Level];
+  asks: [Level];
+  is_snapshot: bool = false;
+}
+
+// Heartbeat represents a connection keep-alive.
+table Heartbeat {
+  // sequence_number moved to MarketEvent envelope for unified gap detection
+}
+
+// Snapshot represents a summary of current market conditions.
+table Snapshot {
+  last_price: double;
+  last_volume: double;
+  high: double;
+  low: double;
+  open: double;
+  close: double;
+  order_book: OrderBookUpdate;
+}
+
+// ReplayResponse indicates the status of a historical data replay request.
+table ReplayResponse {
+  is_complete: bool = false;
+  start_sequence: uint64;
+  end_sequence: uint64;
+}
+
+// EventPayload is a union of all possible event types.
+union EventPayload {
+  Tick,
+  OrderBookUpdate,
+  Heartbeat,
+  Snapshot,
+  ReplayResponse
+}
+
+// MarketEvent is the top-level envelope for all streaming messages over WebSocket.
+table MarketEvent {
+  symbol: string;
+  timestamp: int64;
+  sequence_number: uint64; // Global sequence number for gap detection
+  payload: EventPayload;
+}
+
+root_type MarketEvent;

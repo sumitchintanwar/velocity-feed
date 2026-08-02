@@ -20,8 +20,6 @@ docs/results/
 *.tar.gz
 
 # Generated protocol buffers and flatbuffers
-api/proto/
-api/flatbuffers/
 protoc/
 
 # Profiling and test databases

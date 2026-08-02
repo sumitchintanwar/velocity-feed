@@ -54,10 +54,13 @@ func (m *mockAdapter) Run(ctx context.Context) (<-chan marketdata.RawMessage, er
 	return out, nil
 }
 
-func TestManagerAndRegistry(t *testing.T) {
+func init() {
 	exchange.Register("test_mock", func(cfg exchange.AdapterConfig) (exchange.ExchangeAdapter, error) {
 		return &mockAdapter{name: cfg.Name}, nil
 	})
+}
+
+func TestManagerAndRegistry(t *testing.T) {
 
 	logger := log.NewFromConfig(log.Config{Level: "debug"})
 	cfg := []exchange.AdapterConfig{

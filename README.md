@@ -39,9 +39,10 @@ A high-throughput, low-latency WebSocket server that ingests normalised market-d
 │   ├── platform/           # Logger + Prometheus metrics
 │   ├── transport/          # chi router + middleware
 │   └── websocket/          # Per-client WS handler
+├── benchmarks/             # Benchmarking scripts and results
 ├── pkg/client/             # Public Go client SDK
 ├── scripts/                # Dev helper scripts
-└── test/
+└── testing/
     ├── integration/        # End-to-end httptest tests
     └── unit/               # Package-level unit tests
 ```
@@ -141,6 +142,7 @@ RTMDS maintains comprehensive production documentation:
 - **[Security Guide](docs/security/SECURITY_GUIDE.md):** Authentication, entitlements, and secret management.
 - **[Contributing Guide](CONTRIBUTING.md):** PR workflow and contribution guidelines.
 - **[Sequence Diagrams](docs/diagrams/SEQUENCE_DIAGRAMS.md):** Visual flow of pub/sub and replay workflows.
+- **[Benchmarks](benchmarks/FINAL_BENCHMARKS.md):** The canonical performance characteristics and load testing metrics.
 
 ## Adding a Real Feed Provider
 

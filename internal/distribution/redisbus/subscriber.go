@@ -135,22 +135,17 @@ func (s *Subscriber) Start(ctx context.Context) {
 
 // Subscribe adds a symbol to the subscription set. The subscriber will
 // listen on the corresponding Redis channel ("market:AAPL").
-// Optimized for rapid reconnection: updates internal state first (fast),
-// then issues the Redis SUBSCRIBE (slow) outside the lock.
 func (s *Subscriber) Subscribe(symbol string) {
 	s.channelsMu.Lock()
 	s.channels[symbol] = struct{}{}
 	s.channelsMu.Unlock()
 
 	s.pubsubMu.Lock()
-	ps := s.pubsub
-	s.pubsubMu.Unlock()
+	defer s.pubsubMu.Unlock()
 
-	// Issue Redis SUBSCRIBE outside the lock to avoid blocking other
-	// subscribe/unsubscribe calls during thundering herd reconnects.
-	if ps != nil {
+	if s.pubsub != nil {
 		ch := s.prefix + symbol
-		if err := ps.Subscribe(context.Background(), ch); err != nil {
+		if err := s.pubsub.Subscribe(context.Background(), ch); err != nil {
 			s.log.Underlying().Warn().Err(err).Str("symbol", symbol).
 				Str("event", "subscribe_failed").
 				Msg("redis-subscriber: failed to subscribe")
@@ -181,11 +176,10 @@ func (s *Subscriber) SubscribeBatch(symbols []string) {
 	}
 
 	s.pubsubMu.Lock()
-	ps := s.pubsub
-	s.pubsubMu.Unlock()
+	defer s.pubsubMu.Unlock()
 
-	if ps != nil {
-		if err := ps.Subscribe(context.Background(), chs...); err != nil {
+	if s.pubsub != nil {
+		if err := s.pubsub.Subscribe(context.Background(), chs...); err != nil {
 			s.log.Underlying().Warn().Err(err).Int("count", len(chs)).
 				Str("event", "batch_subscribe_failed").
 				Msg("redis-subscriber: batch subscribe failed")
@@ -194,19 +188,17 @@ func (s *Subscriber) SubscribeBatch(symbols []string) {
 }
 
 // Unsubscribe removes a symbol from the subscription set.
-// Optimized: updates internal state first, then issues Redis UNSUBSCRIBE.
 func (s *Subscriber) Unsubscribe(symbol string) {
 	s.channelsMu.Lock()
 	delete(s.channels, symbol)
 	s.channelsMu.Unlock()
 
 	s.pubsubMu.Lock()
-	ps := s.pubsub
-	s.pubsubMu.Unlock()
+	defer s.pubsubMu.Unlock()
 
-	if ps != nil {
+	if s.pubsub != nil {
 		ch := s.prefix + symbol
-		if err := ps.Unsubscribe(context.Background(), ch); err != nil {
+		if err := s.pubsub.Unsubscribe(context.Background(), ch); err != nil {
 			s.log.Underlying().Warn().Err(err).Str("symbol", symbol).
 				Str("event", "unsubscribe_failed").
 				Msg("redis-subscriber: failed to unsubscribe")

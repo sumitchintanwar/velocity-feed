@@ -18,7 +18,7 @@ Defines the physical boundaries, data flows, API contracts, and observability st
 - [Component Architecture](architecture/COMPONENT_ARCHITECTURE.md)
 - [Data Flow](architecture/DATA_FLOW_ARCHITECTURE.md)
 - [Observability Architecture](architecture/OBSERVABILITY_ARCHITECTURE.md)
-- [API Reference & Contracts](architecture/API_REFERENCE.md)
+- [API Reference & Contracts](../api/openapi.yaml)
 - [Glossary](architecture/GLOSSARY_GUIDE.md)
 
 ### 🏛️ Architecture Decision Records (`/adr`)
@@ -30,9 +30,8 @@ Immutable historical records of our major technical pivots and infrastructure ch
 ### 🛠️ Operations (`/operations`)
 "Break Glass" procedures, runbooks, and deployment guides for on-call SREs.
 - [Troubleshooting Guide](operations/TROUBLESHOOTING_GUIDE.md)
-- [Operational Runbooks](operations/RUNBOOKS_INDEX.md)
+- [Operations Manual](operations/OPERATIONS_MANUAL.md)
 - [Recovery Guide](operations/RECOVERY_GUIDE.md)
-- [Deployment Guide](operations/GENERAL_DEPLOYMENT_GUIDE.md)
 
 ### 💻 Development (`/development`)
 Engineering culture, coding standards, and contribution expectations.

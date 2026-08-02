@@ -51,9 +51,6 @@ func (r *RedisPublisher) PublishIncrement(inc OrderBookIncrement) error {
 	// Topic string logic
 	topic := "rtmds:l2:" + inc.Symbol
 
-	// Mocking redis publish for now:
-	// return r.client.Publish(context.Background(), topic, payload).Err()
-
 	// Simulate success
 	_ = payload
 	_ = topic

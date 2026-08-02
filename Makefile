@@ -47,15 +47,19 @@ test:
 
 ## test-unit: Run only the unit tests
 test-unit:
-	go test -race -count=1 ./test/unit/...
+	go test -race -count=1 ./testing/unit/...
 
 ## test-integration: Run only the integration tests
 test-integration:
-	go test -race -count=1 -timeout=30s ./test/integration/...
+	go test -race -count=1 -timeout=30s ./testing/integration/...
 
 ## bench: Run benchmarks
 bench:
 	go test -bench=. -benchmem ./...
+
+## bench-full: Run the automated comprehensive benchmarking suite
+bench-full:
+	python benchmarks/scripts/run_all.py
 
 # ── Quality ───────────────────────────────────────────────────────────────────
 ## lint: Run golangci-lint (must be installed separately)
@@ -280,15 +284,15 @@ discovery-gateways:
 # ── Utilities ─────────────────────────────────────────────────────────────────
 ## stress-test: Run automated progressive stress testing to find saturation point
 stress-test:
-	./scripts/run_stress_test.sh
+	./benchmarks/scripts/run_stress_test.sh
 
 ## soak-test: Run extended stability and memory leak test
 soak-test:
-	./scripts/run_soak_test.sh
+	./benchmarks/scripts/run_soak_test.sh
 
 ## spike-test: Run burst traffic test to observe system recovery
 spike-test:
-	./scripts/run_spike_test.sh
+	./benchmarks/scripts/run_spike_test.sh
 
 ## clean: Remove build artifacts
 clean:

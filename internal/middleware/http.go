@@ -28,9 +28,8 @@ func HTTPPipeline(baseLogger *log.Logger, metrics *platform.Metrics, serviceName
 		chimw.RequestID,
 		chimw.RealIP,
 
-		// 2. Timeout: Enforce a global request deadline to prevent cascading failures.
-		// If a downstream service hangs, the context is cancelled after 30s.
-		chimw.Timeout(30 * time.Second),
+		// 2. Timeout: Removed because a global timeout kills long-lived WebSocket connections
+		// exactly after 30 seconds, causing reconnect storms.
 
 		// 3. Correlation ID: Extract from inbound headers, inject into W3C Baggage and context.
 		// Uses the correlation middleware that properly propagates via W3C Baggage,

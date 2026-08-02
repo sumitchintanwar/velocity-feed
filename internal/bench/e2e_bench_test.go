@@ -6,6 +6,7 @@ import (
 	"math"
 	"runtime"
 	"sort"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -22,6 +23,7 @@ import (
 
 // latencyRecorder captures generation-to-delivery latency in a histogram.
 type latencyRecorder struct {
+	mu        sync.Mutex
 	histogram []time.Duration
 }
 
@@ -30,10 +32,18 @@ func newLatencyRecorder(capacity int) *latencyRecorder {
 }
 
 func (r *latencyRecorder) Record(d time.Duration) {
+	r.mu.Lock()
 	r.histogram = append(r.histogram, d)
+	r.mu.Unlock()
 }
 
 func (r *latencyRecorder) Percentile(p float64) time.Duration {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.percentile(p)
+}
+
+func (r *latencyRecorder) percentile(p float64) time.Duration {
 	if len(r.histogram) == 0 {
 		return 0
 	}
@@ -48,12 +58,14 @@ func (r *latencyRecorder) Percentile(p float64) time.Duration {
 }
 
 func (r *latencyRecorder) Summary() string {
+	r.mu.Lock()
+	defer r.mu.Unlock()
 	return fmt.Sprintf(
 		"P50=%s P95=%s P99=%s P99.9=%s (n=%d)",
-		r.Percentile(0.50),
-		r.Percentile(0.95),
-		r.Percentile(0.99),
-		r.Percentile(0.999),
+		r.percentile(0.50),
+		r.percentile(0.95),
+		r.percentile(0.99),
+		r.percentile(0.999),
 		len(r.histogram),
 	)
 }

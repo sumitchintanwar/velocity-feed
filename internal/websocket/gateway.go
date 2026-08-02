@@ -49,7 +49,10 @@ const (
 
 var (
 	// writeWait is the deadline for a write to the WebSocket.
-	writeWait = 10 * time.Second
+	// NOTE: Under high concurrent load on Docker/Windows, TCP send buffers can
+	// temporarily back-pressure writes. 30s gives the OS time to drain buffers
+	// without triggering spurious write-deadline evictions during benchmarks.
+	writeWait = 30 * time.Second
 
 	// pongWait is the deadline for reading the next pong from the client.
 	// Design spec: 90 seconds (allows missing up to 3 pings at 30s interval).

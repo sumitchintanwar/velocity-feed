@@ -99,11 +99,9 @@ func benchPipeline(b *testing.B, symbols []string) {
 	start := time.Now()
 	pub.count.Store(0)
 
-	for i := 0; i < b.N; i++ {
-		for pub.count.Load() == 0 {
-			time.Sleep(time.Microsecond)
-		}
-		pub.count.Add(-1)
+	target := int64(b.N)
+	for pub.count.Load() < target {
+		time.Sleep(100 * time.Microsecond)
 	}
 
 	elapsed := time.Since(start)
@@ -132,13 +130,17 @@ func benchPipelineWithBus(b *testing.B, numSubs int) {
 	metrics, _ := platform.NewMetrics("bench_feed")
 	bus := pubsub.NewMemoryBus(zerolog.Nop(), metrics)
 
+	var count atomic.Int64
 	subs := make([]pubsub.Subscription, numSubs)
 	for i := 0; i < numSubs; i++ {
 		subs[i] = bus.Subscribe(fmt.Sprintf("c%d", i), "AAPL")
-		go func() {
-			for range subs[i].C() {
+		go func(idx int) {
+			for range subs[idx].C() {
+				if idx == 0 {
+					count.Add(1)
+				}
 			}
-		}()
+		}(i)
 	}
 
 	p := NewPipeline(f, bus, sequencer.New(), log.New(nil, "bench"), nil, nil)
@@ -155,8 +157,9 @@ func benchPipelineWithBus(b *testing.B, numSubs int) {
 	b.ReportAllocs()
 
 	start := time.Now()
-	for i := 0; i < b.N; i++ {
-		time.Sleep(time.Microsecond)
+	target := int64(b.N)
+	for count.Load() < target {
+		time.Sleep(100 * time.Microsecond)
 	}
 
 	elapsed := time.Since(start)
@@ -180,13 +183,17 @@ func BenchmarkPipeline_Scaling(b *testing.B) {
 			metrics, _ := platform.NewMetrics("bench_feed")
 			bus := pubsub.NewMemoryBus(zerolog.Nop(), metrics)
 
+			var count atomic.Int64
 			subs := make([]pubsub.Subscription, numSubs)
 			for i := 0; i < numSubs; i++ {
 				subs[i] = bus.Subscribe(fmt.Sprintf("c%d", i), "AAPL")
-				go func() {
-					for range subs[i].C() {
+				go func(idx int) {
+					for range subs[idx].C() {
+						if idx == 0 {
+							count.Add(1)
+						}
 					}
-				}()
+				}(i)
 			}
 
 			p := NewPipeline(f, bus, sequencer.New(), log.New(nil, "bench"), nil, nil)
@@ -201,8 +208,10 @@ func BenchmarkPipeline_Scaling(b *testing.B) {
 
 			b.ResetTimer()
 			b.ReportAllocs()
-			for i := 0; i < b.N; i++ {
-				time.Sleep(time.Microsecond)
+			
+			target := int64(b.N)
+			for count.Load() < target {
+				time.Sleep(100 * time.Microsecond)
 			}
 			b.StopTimer()
 

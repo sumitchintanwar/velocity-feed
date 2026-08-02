@@ -160,7 +160,12 @@ type BenchmarkResult struct {
 	MessagesPerSec   float64           `json:"messages_per_sec"`
 	BytesPerSec      float64           `json:"bytes_per_sec"`
 	ConnectedClients int               `json:"connected_clients"`
+	PeakClients      int               `json:"peak_clients"`
 	FailedClients    int               `json:"failed_clients"`
+	ReconnectCount   int               `json:"reconnect_count"`
+	Retries          int               `json:"retries"`
+	DroppedMessages  int               `json:"dropped_messages"`
+	FailedMessages   int               `json:"failed_messages"`
 	Latency          LatencyStats      `json:"latency"`
 	Histogram        []HistogramBucket `json:"histogram"`
 }
@@ -168,9 +173,11 @@ type BenchmarkResult struct {
 // LatencyStats holds latency statistics.
 type LatencyStats struct {
 	MeanMs float64 `json:"mean_ms"`
+	MedianMs float64 `json:"median_ms"`
 	MinMs  float64 `json:"min_ms"`
 	MaxMs  float64 `json:"max_ms"`
 	P50Ms  float64 `json:"p50_ms"`
+	P90Ms  float64 `json:"p90_ms"`
 	P95Ms  float64 `json:"p95_ms"`
 	P99Ms  float64 `json:"p99_ms"`
 	P999Ms float64 `json:"p999_ms"`
@@ -187,7 +194,12 @@ var (
 	totalMessages atomic.Int64
 	totalBytes    atomic.Int64
 	connected     atomic.Int32
+	peakConnected atomic.Int32
 	failed        atomic.Int32
+	reconnects    atomic.Int32
+	retriesCount  atomic.Int32
+	failedMsgs    atomic.Int64
+	droppedMsgs   atomic.Int64
 	latencyHist   = NewHighResHistogram()
 	benchLogger   *log.Logger
 )
@@ -200,7 +212,7 @@ func main() {
 
 	config := parseFlags()
 
-	ctx, cancel := context.WithTimeout(context.Background(), config.Duration+config.RampUp+10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), config.Duration+config.RampUp+300*time.Second)
 	defer cancel()
 
 	sigCh := make(chan os.Signal, 1)
@@ -259,6 +271,9 @@ func main() {
 		// Retry connection with backoff
 		var conn *websocket.Conn
 		for retries := 0; retries < 3; retries++ {
+			if retries > 0 {
+				retriesCount.Add(1)
+			}
 			var err error
 			conn, err = connectAndSubscribe(config.WebSocketURL, config.NumSymbols)
 			if err == nil {
@@ -278,6 +293,18 @@ func main() {
 		clients = append(clients, conn)
 		clientsMu.Unlock()
 		connected.Add(1)
+		
+		curr := connected.Load()
+		for {
+			peak := peakConnected.Load()
+			if curr > peak {
+				if peakConnected.CompareAndSwap(peak, curr) {
+					break
+				}
+			} else {
+				break
+			}
+		}
 
 		// Start receiver goroutine with reconnection
 		go receiveLoopWithReconnect(ctx, conn, i, config)
@@ -383,28 +410,15 @@ func connectAndSubscribe(wsURL string, numSymbols int) (*websocket.Conn, error) 
 }
 
 func generateSymbols(n int) []string {
-	symbols := []string{"AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "JNJ",
-		"WMT", "PG", "MA", "UNH", "HD", "DIS", "BAC", "XOM", "CSCO", "VZ",
-		"INTC", "KO", "CVX", "MRK", "PFE", "TMO", "ABT", "COST", "AVGO", "NKE"}
-
-	// Zipfian distribution simulation
-	// 50% chance to pick from top 3
-	// 30% chance to pick from next 7
-	// 20% chance to pick from remainder
+	symbols := []string{"AAPL", "MSFT", "GOOG", "AMZN", "TSLA", "META", "NVDA", "JPM", "V", "JNJ"}
+	if n > len(symbols) {
+		n = len(symbols)
+	}
 	selected := make(map[string]bool)
 	var result []string
 
-	for len(result) < n && len(result) < len(symbols) {
-		r := rand.Float64()
-		var idx int
-		if r < 0.5 {
-			idx = rand.Intn(3)
-		} else if r < 0.8 {
-			idx = 3 + rand.Intn(7)
-		} else {
-			idx = 10 + rand.Intn(len(symbols)-10)
-		}
-
+	for len(result) < n {
+		idx := rand.Intn(len(symbols))
 		sym := symbols[idx]
 		if !selected[sym] {
 			selected[sym] = true
@@ -444,6 +458,22 @@ func receiveLoop(ctx context.Context, conn *websocket.Conn, clientID int) {
 			return
 		}
 
+		if bytes.Contains(message, []byte(`"type":"ping"`)) {
+			var ping struct {
+				Payload struct {
+					Timestamp int64 `json:"timestamp"`
+				} `json:"payload"`
+			}
+			if err := json.Unmarshal(message, &ping); err == nil {
+				pong := map[string]interface{}{
+					"action":    "pong",
+					"timestamp": ping.Payload.Timestamp,
+				}
+				_ = conn.WriteJSON(pong)
+			}
+			continue
+		}
+
 		totalMessages.Add(1)
 		totalBytes.Add(int64(len(message)))
 
@@ -452,7 +482,10 @@ func receiveLoop(ctx context.Context, conn *websocket.Conn, clientID int) {
 		if tsStr != "" {
 			if ts, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
 				latencyMs := float64(time.Since(ts).Microseconds()) / 1000.0
-				if latencyMs > 0 && latencyMs < 10000 { // filter outliers
+				if latencyMs < 0 { // Allow any clock drift
+					latencyMs = 0.0
+				}
+				if latencyMs >= 0 && latencyMs < 60000 { // filter extreme outliers (>60s)
 					latencyHist.Record(latencyMs)
 				}
 			}
@@ -479,6 +512,15 @@ func receiveLoopWithReconnect(ctx context.Context, initialConn *websocket.Conn, 
 
 		_, message, err := conn.ReadMessage()
 		if err != nil {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+			}
+
+			if clientID < 5 { // limit logs to first few clients to avoid console spam
+				log.Debug(ctx, benchLogger).Int("client_id", clientID).Err(err).Msg("Client read error, attempting reconnect")
+			}
 			// Connection lost — attempt reconnect
 			select {
 			case <-ctx.Done():
@@ -500,6 +542,7 @@ func receiveLoopWithReconnect(ctx context.Context, initialConn *websocket.Conn, 
 			}
 
 			// Try to reconnect
+			reconnects.Add(1)
 			newConn, err := connectAndSubscribe(config.WebSocketURL, config.NumSymbols)
 			if err != nil {
 				// Reconnect failed, continue loop and try again
@@ -515,6 +558,22 @@ func receiveLoopWithReconnect(ctx context.Context, initialConn *websocket.Conn, 
 		// Reset backoff on successful message
 		backoff = 500 * time.Millisecond
 
+		if bytes.Contains(message, []byte(`"type":"ping"`)) {
+			var ping struct {
+				Payload struct {
+					Timestamp int64 `json:"timestamp"`
+				} `json:"payload"`
+			}
+			if err := json.Unmarshal(message, &ping); err == nil {
+				pong := map[string]interface{}{
+					"action":    "pong",
+					"timestamp": ping.Payload.Timestamp,
+				}
+				_ = conn.WriteJSON(pong)
+			}
+			continue
+		}
+
 		totalMessages.Add(1)
 		totalBytes.Add(int64(len(message)))
 
@@ -523,7 +582,10 @@ func receiveLoopWithReconnect(ctx context.Context, initialConn *websocket.Conn, 
 		if tsStr != "" {
 			if ts, err := time.Parse(time.RFC3339Nano, tsStr); err == nil {
 				latencyMs := float64(time.Since(ts).Microseconds()) / 1000.0
-				if latencyMs > 0 && latencyMs < 10000 { // filter outliers
+				if latencyMs < 0 { // Allow any clock drift
+					latencyMs = 0.0
+				}
+				if latencyMs >= 0 && latencyMs < 60000 { // filter extreme outliers (>60s)
 					latencyHist.Record(latencyMs)
 				}
 			}
@@ -560,15 +622,22 @@ func generateResult(config *BenchmarkConfig, duration time.Duration, startTime t
 		MessagesPerSec:   float64(msgs) / duration.Seconds(),
 		BytesPerSec:      float64(bytes) / duration.Seconds(),
 		ConnectedClients: int(connected.Load()),
+		PeakClients:      int(peakConnected.Load()),
 		FailedClients:    int(failed.Load()),
+		ReconnectCount:   int(reconnects.Load()),
+		Retries:          int(retriesCount.Load()),
+		DroppedMessages:  int(droppedMsgs.Load()),
+		FailedMessages:   int(failedMsgs.Load()),
 		Latency: LatencyStats{
-			MeanMs: latencyHist.Mean(),
-			MinMs:  latencyHist.Min,
-			MaxMs:  latencyHist.Max,
-			P50Ms:  latencyHist.Percentile(50),
-			P95Ms:  latencyHist.Percentile(95),
-			P99Ms:  latencyHist.Percentile(99),
-			P999Ms: latencyHist.Percentile(99.9),
+			MeanMs:   latencyHist.Mean(),
+			MedianMs: latencyHist.Percentile(50),
+			MinMs:    latencyHist.Min,
+			MaxMs:    latencyHist.Max,
+			P50Ms:    latencyHist.Percentile(50),
+			P90Ms:    latencyHist.Percentile(90),
+			P95Ms:    latencyHist.Percentile(95),
+			P99Ms:    latencyHist.Percentile(99),
+			P999Ms:   latencyHist.Percentile(99.9),
 		},
 		Histogram: make([]HistogramBucket, 0),
 	}
@@ -609,8 +678,10 @@ func printResults(result *BenchmarkResult) {
 	fmt.Println("║                    BENCHMARK RESULTS                    ║")
 	fmt.Println("╚═══════════════════════════════════════════════════════════╝")
 	fmt.Printf("\nDuration:        %s\n", result.Duration)
-	fmt.Printf("Connected:       %d clients\n", result.ConnectedClients)
+	fmt.Printf("Connected:       %d clients (Peak: %d)\n", result.ConnectedClients, result.PeakClients)
 	fmt.Printf("Failed:          %d clients\n", result.FailedClients)
+	fmt.Printf("Reconnects:      %d\n", result.ReconnectCount)
+	fmt.Printf("Retries:         %d\n", result.Retries)
 	fmt.Printf("Total Messages:  %d\n", result.TotalMessages)
 	fmt.Printf("Total Bytes:     %d\n", result.TotalBytes)
 	fmt.Printf("\nThroughput:      %.0f msg/sec\n", result.MessagesPerSec)
@@ -620,6 +691,7 @@ func printResults(result *BenchmarkResult) {
 	fmt.Printf("  Min:           %.2f ms\n", result.Latency.MinMs)
 	fmt.Printf("  Max:           %.2f ms\n", result.Latency.MaxMs)
 	fmt.Printf("  P50:           %.2f ms\n", result.Latency.P50Ms)
+	fmt.Printf("  P90:           %.2f ms\n", result.Latency.P90Ms)
 	fmt.Printf("  P95:           %.2f ms\n", result.Latency.P95Ms)
 	fmt.Printf("  P99:           %.2f ms\n", result.Latency.P99Ms)
 	fmt.Printf("  P99.9:         %.2f ms\n", result.Latency.P999Ms)

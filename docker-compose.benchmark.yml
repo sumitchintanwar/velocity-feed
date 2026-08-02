@@ -55,7 +55,11 @@ services:
       resources:
         limits:
           cpus: "2"
-          memory: 512M
+          memory: 2048M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   gateway2:
     build:
@@ -85,7 +89,11 @@ services:
       resources:
         limits:
           cpus: "2"
-          memory: 512M
+          memory: 2048M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   gateway3:
     build:
@@ -115,7 +123,11 @@ services:
       resources:
         limits:
           cpus: "2"
-          memory: 512M
+          memory: 2048M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   gateway4:
     build:
@@ -145,7 +157,11 @@ services:
       resources:
         limits:
           cpus: "2"
-          memory: 512M
+          memory: 2048M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   gateway5:
     build:
@@ -175,7 +191,11 @@ services:
       resources:
         limits:
           cpus: "2"
-          memory: 512M
+          memory: 2048M
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
   nginx:
     image: nginx:alpine
@@ -190,6 +210,10 @@ services:
       - gateway3
     networks:
       - bench-net
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
 
 networks:
   bench-net:

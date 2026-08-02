@@ -1,0 +1,37 @@
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+
+# Test output, profiling, and coverage
+*.log
+*.txt
+*.prof
+*.pprof
+*.out
+coverage
+docs/results/
+
+# Archives
+*.zipgit 
+*.tar.gz
+
+# Generated protocol buffers and flatbuffers
+api/proto/
+api/flatbuffers/
+protoc/
+
+# Profiling and test databases
+profiles_*/
+internal/app/data/wal/
+
+# IDEs and editors
+.idea/
+.vscode/
+*.swp
+
+.agents
+graphify-out

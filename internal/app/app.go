@@ -334,10 +334,10 @@ func (a *App) wire() error {
 				return nil
 			},
 			health: func(ctx context.Context) platform.HealthStatus {
-				topics := tm.TopicCount()
-				if topics == 0 {
-					return platform.Degraded("no active topics")
-				}
+				// Always return OK — having 0 active topics is normal at startup
+				// and between benchmark trials. Returning Degraded here causes Nginx
+				// to mark gateways unhealthy (max_fails), blocking WebSocket upgrades.
+				_ = tm.TopicCount()
 				return platform.OK()
 			},
 		})
@@ -493,7 +493,7 @@ func (a *App) wire() error {
 	// WAL and Sequencer initialized above (moved to 2c)
 
 	// ── 3. WebSocket Gateway ────────────────────────────────────
-	// Rate limit: 500 new connections/sec per gateway to prevent thundering herd.
+	// Rate limit: 2000 new connections/sec per gateway to prevent thundering herd.
 	// Gateway ID is used for sticky session routing verification.
 	// When Redis is enabled, use the distributed router for gateway independence.
 	if a.mode == ModeMonolith || a.mode == ModeGateway {
@@ -502,7 +502,7 @@ func (a *App) wire() error {
 			tmForGateway = router
 		}
 		gwLogger := log.WebSocketGateway(a.log, a.cfg.Server.GetGatewayID())
-		gw := websocket.NewGatewayWithReplay(tmForGateway, snap, replayHandler, walReplayer, gwLogger, metrics, 500, a.cfg.Server.GetGatewayID())
+		gw := websocket.NewGatewayWithReplay(tmForGateway, snap, replayHandler, walReplayer, gwLogger, metrics, 2000, a.cfg.Server.GetGatewayID())
 		a.gateway = gw
 
 		a.registerComponent(component{
@@ -821,7 +821,6 @@ func (a *App) wire() error {
 
 			adapter := &discoveryRegistryAdapter{r: reg}
 			a.routingEngine = routing.NewEngine(a.cfg.Server.GetGatewayID(), adapter, pm, 1*time.Second)
-			a.gateway.SetRedirector(a.routingEngine)
 
 			gatewayInfo := discovery.GatewayInfo{
 				ID:            a.cfg.Server.GetGatewayID(),
@@ -954,8 +953,11 @@ func (a *App) wire() error {
 
 	srv := &http.Server{
 		Handler:        httpRouter,
-		ReadTimeout:    a.cfg.Server.ReadTimeout,
-		WriteTimeout:   a.cfg.Server.WriteTimeout,
+		// ReadTimeout and WriteTimeout are explicitly disabled (set to 0) to prevent
+		// the global HTTP server timeouts from forcefully closing long-lived WebSocket
+		// connections. WebSocket connections manage their own deadlines via ping/pong.
+		ReadTimeout:    0,
+		WriteTimeout:   0,
 		MaxHeaderBytes: 1 << 20, // 1MB — sufficient for WS upgrade headers.
 	}
 	a.server = srv

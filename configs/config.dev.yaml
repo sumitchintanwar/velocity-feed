@@ -30,7 +30,7 @@ metrics:
   path: "/metrics"
 
 database:
-  enabled: true
+  enabled: false   # Set to true if local PostgreSQL is running on :5432
   host: "localhost"
   port: 5432
   user: "postgres"

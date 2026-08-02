@@ -3,6 +3,7 @@ package gateway
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -10,22 +11,43 @@ import (
 )
 
 type mockConnection struct {
+	mu        sync.Mutex
 	responses []ConnectResponse
 	messages  []*wal.Message
 }
 
 func (m *mockConnection) SendResponse(resp ConnectResponse) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.responses = append(m.responses, resp)
 	return nil
 }
 
 func (m *mockConnection) SendStream(msg *wal.Message) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.messages = append(m.messages, msg)
 	return nil
 }
 
 func (m *mockConnection) Close() error {
 	return nil
+}
+
+func (m *mockConnection) getResponses() []ConnectResponse {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	res := make([]ConnectResponse, len(m.responses))
+	copy(res, m.responses)
+	return res
+}
+
+func (m *mockConnection) getMessages() []*wal.Message {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	res := make([]*wal.Message, len(m.messages))
+	copy(res, m.messages)
+	return res
 }
 
 func TestServerHandleReconnect_Success(t *testing.T) {
@@ -49,18 +71,20 @@ func TestServerHandleReconnect_Success(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	if len(conn.responses) != 1 {
-		t.Fatalf("Expected 1 response, got %d", len(conn.responses))
+	responses := conn.getResponses()
+	if len(responses) != 1 {
+		t.Fatalf("Expected 1 response, got %d", len(responses))
 	}
-	if !conn.responses[0].Success {
-		t.Fatalf("Expected success response, got error: %s", conn.responses[0].Error)
+	if !responses[0].Success {
+		t.Fatalf("Expected success response, got error: %s", responses[0].Error)
 	}
 
-	if len(conn.messages) != 1 {
-		t.Fatalf("Expected 1 message streamed, got %d", len(conn.messages))
+	messages := conn.getMessages()
+	if len(messages) != 1 {
+		t.Fatalf("Expected 1 message streamed, got %d", len(messages))
 	}
-	if conn.messages[0].Sequence != 10 {
-		t.Errorf("Expected sequence 10, got %d", conn.messages[0].Sequence)
+	if messages[0].Sequence != 10 {
+		t.Errorf("Expected sequence 10, got %d", messages[0].Sequence)
 	}
 }
 
@@ -83,13 +107,14 @@ func TestServerHandleReconnect_Failure(t *testing.T) {
 		t.Fatalf("Expected error from HandleReconnect, got nil")
 	}
 
-	if len(conn.responses) != 1 {
-		t.Fatalf("Expected 1 response sent to client, got %d", len(conn.responses))
+	responses := conn.getResponses()
+	if len(responses) != 1 {
+		t.Fatalf("Expected 1 response sent to client, got %d", len(responses))
 	}
-	if conn.responses[0].Success {
+	if responses[0].Success {
 		t.Fatalf("Expected failure response, got success")
 	}
-	if conn.responses[0].Error != expectedErr.Error() {
-		t.Errorf("Expected error string %q, got %q", expectedErr.Error(), conn.responses[0].Error)
+	if responses[0].Error != expectedErr.Error() {
+		t.Errorf("Expected error string %q, got %q", expectedErr.Error(), responses[0].Error)
 	}
 }
